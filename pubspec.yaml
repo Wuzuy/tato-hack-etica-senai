@@ -1,0 +1,33 @@
+name: tato
+description: "A new Flutter project."
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_tts: ^3.8.3
+  #google_generative_ai: ^0.5.0
+  flutter_map: ^6.1.0 # Use a versão mais recente
+  latlong2: ^0.9.1 # Use a versão mais recente
+  shared_preferences: ^2.2.2  # Armazena dados simples no dispositivo (primeiro acesso, etc).
+#  speech_to_text: ^6.6.0 # Reconhece a fala do usuário, convertendo voz em texto.
+  geocoding: ^2.1.1 # Converte endereços de texto em coordenadas geográficas.
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+
+flutter:
+
+  uses-material-design: true
+
+  assets:
+     - images/
