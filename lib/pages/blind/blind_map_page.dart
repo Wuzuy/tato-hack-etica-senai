@@ -11,9 +11,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'usage_guide_page.dart';
-import 'chat_page.dart';
-import 'settings_page.dart';
+import 'blind_usage_guide_page.dart';
+import 'blind_chat_page.dart';
+import 'blind_settings_page.dart';
 
 const String _fontScaleKey = 'fontScale';
 const String _colorSchemeKey = 'colorScheme';
@@ -77,7 +77,7 @@ class _BlindMapPageState extends State<BlindMapPage> {
 
   Future<void> _speakInitialInstructions() async {
     await _flutterTts.speak(
-        "Bem-vindo à navegação por áudio. Toque no botão de microfone e diga o endereço da instituição que deseja buscar. Diga 'guia' para ver as opções.");
+        "Bem-vindo ao Tato. Toque no botão de microfone e diga o nome da sua empresa.");
   }
 
   Future<void> _initializeSpeech() async {
@@ -326,91 +326,93 @@ class _BlindMapPageState extends State<BlindMapPage> {
           ),
         ],
       ),
-      body: Stack(
-        children: <Widget>[
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              center: _center,
-              zoom: 15.0,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.tato',
+      body: SafeArea( // Adicionado o widget SafeArea
+        child: Stack(
+          children: <Widget>[
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                center: _center,
+                zoom: 15.0,
               ),
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: _routePoints,
-                    strokeWidth: 5.0,
-                    color: Colors.blue,
-                  ),
-                ],
-              ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: _center,
-                    child: Icon(Icons.location_on, color: Colors.red, size: 40 * _fontScale),
-                  ),
-                  if (_routePoints.length > 1)
-                    Marker(
-                      point: _routePoints.last,
-                      child: Icon(Icons.location_on, color: Colors.blue, size: 40 * _fontScale),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.tato',
+                ),
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: _routePoints,
+                      strokeWidth: 5.0,
+                      color: Colors.blue,
                     ),
-                ],
-              ),
-            ],
-          ),
-          Positioned(
-            bottom: 20,
-            left: 20,
-            right: 20,
-            child: Card(
-              color: _getCardColor(),
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: InkWell(
-                onTap: () {
-                  if (_isListening) {
-                    _stopListening();
-                  } else {
-                    _startListening();
-                  }
-                },
-                borderRadius: BorderRadius.circular(15),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _isListening ? Icons.mic_off : Icons.mic,
-                        color: _isListening
-                            ? Colors.red
-                            : _getMicIconColor(),
-                        size: 36 * _fontScale,
+                  ],
+                ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _center,
+                      child: Icon(Icons.location_on, color: Colors.red, size: 40 * _fontScale),
+                    ),
+                    if (_routePoints.length > 1)
+                      Marker(
+                        point: _routePoints.last,
+                        child: Icon(Icons.location_on, color: Colors.blue, size: 40 * _fontScale),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          _isListening
-                              ? "Ouvindo..."
-                              : (_lastWords.isEmpty ? "Toque para falar" : _lastWords),
-                          style: TextStyle(fontSize: 18 * _fontScale, color: _getTextColor()),
-                          textAlign: TextAlign.center,
+                  ],
+                ),
+              ],
+            ),
+            Positioned(
+              bottom: 20,
+              left: 20,
+              right: 20,
+              child: Card(
+                color: _getCardColor(),
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: InkWell(
+                  onTap: () {
+                    if (_isListening) {
+                      _stopListening();
+                    } else {
+                      _startListening();
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(15),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _isListening ? Icons.mic_off : Icons.mic,
+                          color: _isListening
+                              ? Colors.red
+                              : _getMicIconColor(),
+                          size: 36 * _fontScale,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            _isListening
+                                ? "Ouvindo..."
+                                : (_lastWords.isEmpty ? "Toque para falar" : _lastWords),
+                            style: TextStyle(fontSize: 18 * _fontScale, color: _getTextColor()),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
