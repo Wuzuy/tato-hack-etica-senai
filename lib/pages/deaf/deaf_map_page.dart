@@ -9,8 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'deaf_chat_page.dart';
-import 'deaf_voice_transcription_page.dart';
+import 'deaf_map_enterprise_page.dart'; // Importa a nova página empresarial
 import 'deaf_settings_page.dart'; // Importa a página de configurações
 
 const String _fontScaleKey = 'fontScale';
@@ -19,7 +18,7 @@ const String _colorSchemeKey = 'colorScheme';
 // Chave da API para OpenRouteService
 // A chave fornecida pelo usuário é para o OpenRouteService, não para o OSRM.
 // O OSRM é o motor de roteamento, mas o OpenRouteService é a plataforma que o usa.
-const String _openRouteServiceApiKey = 'eyJvcmciOiI1YjNjZmM5OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRkOGQ4YTEwOWE2ZTRmNjhiM2RiNDY4ODc3NTczZDZlIiwiaCI6Im11cm11cjY0In0=';
+const String _openRouteServiceApiKey = 'eyJvcmciOiI1YjNjZmM5OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRkOGQ4YTEwOWE2ZTRmNjhiM2RiNDY4ODc3NTUzZDZlIiwiaCI6Im11cm11cjY0In0=';
 
 class DeafMapPage extends StatefulWidget {
   const DeafMapPage({super.key});
@@ -331,46 +330,22 @@ class _DeafMapPageState extends State<DeafMapPage> {
                 ),
               ),
             ),
-            // Botões de ação como ícones flutuantes
+            // Botão para ir para a página empresarial
             Positioned(
               bottom: 80.0,
               right: 16.0,
-              child: Column(
-                children: [
-                  FloatingActionButton(
-                    heroTag: 'chatBtn',
-                    mini: false,
-                    backgroundColor: _getPrimaryColor(),
-                    onPressed: () {
-                      Navigator.of(context).push(MaterialPageRoute(builder: (context) => const DeafChatPage()));
-                    },
-                    child: const Icon(Icons.chat, color: Colors.white, size: 30),
-                  ),
-                  const SizedBox(height: 10),
-                  FloatingActionButton(
-                    heroTag: 'transcriptionBtn',
-                    mini: false,
-                    backgroundColor: _getPrimaryColor(),
-                    onPressed: () {
-                      Navigator.of(context).push(MaterialPageRoute(builder: (context) => const VoiceTranscriptionDeafPage()));
-                    },
-                    child: const Icon(Icons.mic, color: Colors.white, size: 30),
-                  ),
-                  const SizedBox(height: 10),
-                  FloatingActionButton(
-                    heroTag: 'sosBtn',
-                    mini: false,
-                    backgroundColor: Colors.red,
-                    onPressed: () {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Alerta SOS enviado!')),
-                        );
-                      }
-                    },
-                    child: const Icon(Icons.warning, color: Colors.white, size: 30),
-                  ),
-                ],
+              child: FloatingActionButton(
+                heroTag: 'enterpriseBtn',
+                mini: false,
+                backgroundColor: _getPrimaryColor(),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const DeafMapEnterprisePage(),
+                    ),
+                  );
+                },
+                child: const Icon(Icons.business, color: Colors.white, size: 30),
               ),
             ),
           ],

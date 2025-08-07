@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'blind_usage_guide_page.dart';
 import 'blind_chat_page.dart';
 import 'blind_settings_page.dart';
+import 'blind_map_enterprise_page.dart';
 
 const String _fontScaleKey = 'fontScale';
 const String _colorSchemeKey = 'colorScheme';
@@ -40,7 +41,7 @@ class _BlindMapPageState extends State<BlindMapPage> {
   double _fontScale = 1.0;
   String _colorScheme = 'Padrão';
 
-  final String _openRouteServiceApiKey = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRkOGQ4YTEwOWE2ZTRmNjhiM2RiNDY4ODc3NTczZDZlIiwiaCI6Im11cm11cjY0In0=';
+  final String _openRouteServiceApiKey = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRkOGQ4YTEwOWE5ZTRmNjhiM2RiNDY4ODc3NTczZDZlIiwiaCI6Im11cm11cjY0In0=';
 
   @override
   void initState() {
@@ -160,6 +161,8 @@ class _BlindMapPageState extends State<BlindMapPage> {
       _navigateToChatPage();
     } else if (normalizedCommand.contains('configurações') || normalizedCommand.contains('ajustes')) {
       _navigateToSettingsPage();
+    } else if (normalizedCommand.contains('mapa empresarial')) {
+      _navigateToBlindMapEnterprisePage();
     } else {
       _flutterTts.speak("Comando não reconhecido. Por favor, tente novamente.");
     }
@@ -252,6 +255,13 @@ class _BlindMapPageState extends State<BlindMapPage> {
     ).then((_) => _loadSettings());
   }
 
+  void _navigateToBlindMapEnterprisePage() {
+    _flutterTts.stop();
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const BlindMapEnterprisePage()),
+    ).then((_) => _loadSettings());
+  }
+
   Color _getPrimaryColor() {
     switch (_colorScheme) {
       case 'Alto Contraste':
@@ -305,16 +315,6 @@ class _BlindMapPageState extends State<BlindMapPage> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.help_outline, color: _getAppBarIconColor(), size: 24 * _fontScale),
-            onPressed: _navigateToUsageGuidePage,
-            tooltip: 'Guia de Uso',
-          ),
-          IconButton(
-            icon: Icon(Icons.chat, color: _getAppBarIconColor(), size: 24 * _fontScale),
-            onPressed: _navigateToChatPage,
-            tooltip: 'Chat',
-          ),
-          IconButton(
             icon: Icon(Icons.settings, color: _getAppBarIconColor(), size: 24 * _fontScale),
             onPressed: _navigateToSettingsPage,
             tooltip: 'Configurações',
@@ -326,7 +326,7 @@ class _BlindMapPageState extends State<BlindMapPage> {
           ),
         ],
       ),
-      body: SafeArea( // Adicionado o widget SafeArea
+      body: SafeArea(
         child: Stack(
           children: <Widget>[
             FlutterMap(
@@ -364,6 +364,18 @@ class _BlindMapPageState extends State<BlindMapPage> {
                 ),
               ],
             ),
+            // Floating Action Button maior para o mapa empresarial
+            Positioned(
+              bottom: 120, // Posição ajustada para ficar mais perto do botão de microfone
+              right: 20,
+              child: FloatingActionButton.large(
+                heroTag: 'enterpriseMapButton',
+                backgroundColor: _getPrimaryColor(),
+                onPressed: _navigateToBlindMapEnterprisePage,
+                child: const Icon(Icons.business, color: Colors.white),
+              ),
+            ),
+            // Card do botão de microfone
             Positioned(
               bottom: 20,
               left: 20,
@@ -390,9 +402,7 @@ class _BlindMapPageState extends State<BlindMapPage> {
                       children: [
                         Icon(
                           _isListening ? Icons.mic_off : Icons.mic,
-                          color: _isListening
-                              ? Colors.red
-                              : _getMicIconColor(),
+                          color: _isListening ? Colors.red : _getMicIconColor(),
                           size: 36 * _fontScale,
                         ),
                         const SizedBox(width: 16),

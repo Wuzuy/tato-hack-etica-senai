@@ -19,7 +19,9 @@ GUIA DO USUÁRIO
 
 Diga: 'olá Tati' para ativar nossa inteligência artificial.
 
-Para traçar uma rota, diga \"Tati, traçar rota para o local\"..
+Para traçar uma rota, diga "Tati, traçar rota para o local".
+
+Para enviar um alerta de emergência, diga "Tati socorro" ou "socorro".
 
 Diga: 'Tati, abrir chat' para conversar com os membros da equipe.
 

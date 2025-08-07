@@ -27,28 +27,16 @@ class SecondPage extends StatelessWidget {
             children: [
               Image.asset(
                 'images/tato_logo.png',
-                height: 100,
+                height: 300,
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Tecnologia de Acesso por Toque e Outros Sentidos',
-                style: TextStyle(color: Colors.white, fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'TATO',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 24), // Espaçamento reduzido
               const Text(
                 'Qual versão do aplicativo mais se\naplica à sua necessidade?',
-                style: TextStyle(color: Colors.white, fontSize: 22),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold, // Adicionado negrito
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -69,29 +57,30 @@ class SecondPage extends StatelessWidget {
                       );
                     },
                     child: const Padding(
-                      padding: EdgeInsets.all(20.0),
+                      padding: EdgeInsets.all(16.0), // Espaçamento interno reduzido
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.hearing,
                               size: 40, color: Color.fromRGBO(0, 69, 118, 1)),
-                          SizedBox(width: 20),
+                          SizedBox(width: 16), // Espaçamento reduzido
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'Sem Audição',
                                 style: TextStyle(
-                                  fontSize: 18,
+                                  fontSize: 22,
                                   fontWeight: FontWeight.bold,
                                   color: Color.fromRGBO(0, 69, 118, 1),
                                 ),
                               ),
-                              SizedBox(height: 4),
+                              SizedBox(height: 2), // Espaçamento reduzido
                               Text(
                                 'Interface visual otimizada',
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold, // Adicionado negrito
                                   color: Color.fromRGBO(0, 69, 118, 1),
                                 ),
                               ),
@@ -103,7 +92,7 @@ class SecondPage extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16), // Espaçamento reduzido
               SizedBox(
                 width: double.infinity,
                 child: Card(
@@ -121,29 +110,30 @@ class SecondPage extends StatelessWidget {
                       );
                     },
                     child: const Padding(
-                      padding: EdgeInsets.all(20.0),
+                      padding: EdgeInsets.all(16.0), // Espaçamento interno reduzido
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.visibility,
                               size: 40, color: Color.fromRGBO(0, 69, 118, 1)),
-                          SizedBox(width: 20),
+                          SizedBox(width: 16), // Espaçamento reduzido
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'Baixa Visão',
                                 style: TextStyle(
-                                  fontSize: 18,
+                                  fontSize: 22,
                                   fontWeight: FontWeight.bold,
                                   color: Color.fromRGBO(0, 69, 118, 1),
                                 ),
                               ),
-                              SizedBox(height: 4),
+                              SizedBox(height: 2), // Espaçamento reduzido
                               Text(
                                 'Interface com áudio e vibração',
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold, // Adicionado negrito
                                   color: Color.fromRGBO(0, 69, 118, 1),
                                 ),
                               ),
