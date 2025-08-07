@@ -1,25 +1,55 @@
 # TATO - Tecnologia de Acesso por Toque e Outros Sentidos
 
-<p align="left">
-  <img src="https://github.com/user-attachments/assets/a87a7fab-7529-427b-ad1d-11ffb28947ce" alt="Logo do TATO" width="200"/>
-</p>
+
 
 ### Sobre o Projeto
 
-O TATO é um aplicativo mobile focado em acessibilidade, criado para ajudar pessoas com deficiência visual e auditiva a interagirem com o ambiente de forma mais segura e independente. O nome "TATO" reflete a missão de usar o toque e outros sentidos para criar uma experiência de navegação inclusiva.
+O TATO é um aplicativo mobile focado em acessibilidade, criado para empoderar pessoas com deficiência visual e auditiva. Nosso objetivo é proporcionar maior segurança e independência na interação com o ambiente, utilizando o toque e outros sentidos para criar uma experiência de navegação e comunicação verdadeiramente inclusiva.
 
-O aplicativo oferece duas versões principais, cada uma adaptada para uma necessidade específica.
+O aplicativo é desenvolvido em duas versões principais, cada uma cuidadosamente adaptada para atender a necessidades específicas.
 
-### Versão para Cegos (Navegação por Áudio e Vibração)
-* **Guia de Uso Narrado:** No primeiro acesso, o aplicativo lê em voz alta um guia completo sobre como usar a navegação.
-* **Rotas e Geolocalização:** O usuário pode digitar um endereço para traçar uma rota no mapa, recebendo as direções por áudio.
+### Funcionalidades Principais
 
-### Versão para Surdos (Interface Visual Otimizada)
+#### Versão para Baixa Visão (Navegação por Áudio)
+
+* **Guia de Uso Narrado:** No primeiro acesso, o aplicativo lê em voz alta um guia completo sobre como usar a navegação por áudio.
+
+* **Rotas e Geolocalização:** Permite que o usuário trace rotas no mapa, recebendo as direções de forma auditiva para se locomover com segurança.
+
+* **Ajustes de Acessibilidade:** Oferece opções para modificar o tamanho da fonte e o esquema de cores para se adequar às preferências do usuário.
+
+#### Versão para Surdos (Interface Visual Otimizada)
+
 * **Interface Clara e Direta:** Elementos visuais otimizados para uma navegação fácil e intuitiva.
-* **Comunicação Visual:** O foco está em informações visuais, como o mapa e indicadores na tela.
+
+* **Transcrição de Voz:** Traduz a fala do ambiente em texto na tela, facilitando a comunicação em tempo real.
+
+* **Comunicação Visual:** O foco está em informações visuais, como o mapa e indicadores na tela, para uma experiência de usuário eficiente e direta.
 
 ### Tecnologias Utilizadas
-* **Dart (Linguagem de programação)** e **Flutter (Framework de UI - Interface do Usuário).**
-* **`flutter_map`**: Para a exibição de mapas.
-* **`flutter_tts`**: Para a funcionalidade de texto para voz.
-* **`geocoding`**: Para converter endereços em coordenadas.
+
+O projeto TATO é construído com as seguintes tecnologias:
+
+* **Dart** (Linguagem de programação)
+
+* **Flutter** (Framework de UI)
+
+* **`flutter_map`**: Exibição de mapas e navegação.
+
+* **`flutter_tts`**: Funcionalidade de texto para voz.
+
+* **`geocoding`**: Conversão de endereços em coordenadas.
+
+* **`geolocator`**: Obtenção da localização do usuário.
+
+* **`http`**: Comunicação com APIs externas (como a de rotas, ORS - OpenRouteService).
+
+* **`shared_preferences`**: Persistência de dados das configurações do usuário.
+
+* **`speech_to_text`**: Conversão de fala em texto.
+
+* **`google_fonts`**: Estilização de fontes na interface.
+
+* **`latlong2`**: Manipulação de coordenadas geográficas.
+
+* **`cupertino_icons`**: Ícones de interface.
