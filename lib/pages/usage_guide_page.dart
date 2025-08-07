@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+const String _fontScaleKey = 'fontScale';
+const String _colorSchemeKey = 'colorScheme';
 
 class UsageGuidePage extends StatefulWidget {
   const UsageGuidePage({super.key});
@@ -15,16 +19,20 @@ GUIA DO USUÁRIO
 
 Diga: 'olá Tati' para ativar nossa inteligência artificial.
 
-Para traçar uma rota, digite o endereço no campo de texto e pressione o botão de pesquisa.
+Para traçar uma rota, diga \"Tati, traçar rota para o local\"..
 
-Diga: 'abrir chat' para conversar com os membros da equipe.
+Diga: 'Tati, abrir chat' para conversar com os membros da equipe.
 
-Diga: 'configurações' para acessar a aba de ajustes do app.
+Diga: 'Tati, configurações' para acessar a aba de ajustes do app.
 ''';
+
+  double _fontScale = 1.0;
+  String _colorScheme = 'Padrão';
 
   @override
   void initState() {
     super.initState();
+    _loadSettings();
     _initTts();
     _speakUsageGuide();
   }
@@ -33,6 +41,16 @@ Diga: 'configurações' para acessar a aba de ajustes do app.
   void dispose() {
     _flutterTts.stop();
     super.dispose();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _fontScale = prefs.getDouble(_fontScaleKey) ?? 1.0;
+        _colorScheme = prefs.getString(_colorSchemeKey) ?? 'Padrão';
+      });
+    }
   }
 
   Future<void> _initTts() async {
@@ -44,31 +62,58 @@ Diga: 'configurações' para acessar a aba de ajustes do app.
     await _flutterTts.speak(_usageGuide);
   }
 
+  Color _getPrimaryColor() {
+    switch (_colorScheme) {
+      case 'Alto Contraste':
+        return Colors.black;
+      case 'Protanopia':
+        return const Color.fromRGBO(85, 148, 179, 1);
+      case 'Deuteranopia':
+        return const Color.fromRGBO(179, 148, 85, 1);
+      case 'Tritanopia':
+        return const Color.fromRGBO(148, 85, 179, 1);
+      case 'Modo Escuro':
+        return Colors.blueGrey[800]!;
+      default:
+        return const Color.fromRGBO(0, 69, 118, 1);
+    }
+  }
+
+  Color _getScaffoldBackgroundColor() {
+    return _colorScheme == 'Modo Escuro' ? Colors.grey[900]! : Colors.white;
+  }
+
+  Color _getAppBarContentColor() {
+    return _colorScheme == 'Alto Contraste' || _colorScheme == 'Modo Escuro' ? Colors.white : Colors.white;
+  }
+
+  Color _getTextColor() {
+    return _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _getScaffoldBackgroundColor(),
       appBar: AppBar(
-        title: const Text('Guia de Uso', style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color.fromRGBO(0, 69, 118, 1),
+        title: Text('Guia de Uso', style: TextStyle(color: _getAppBarContentColor(), fontSize: 20 * _fontScale)),
+        backgroundColor: _getPrimaryColor(),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: _getAppBarContentColor(), size: 24 * _fontScale),
           onPressed: () {
             _flutterTts.stop();
             Navigator.of(context).pop();
           },
         ),
       ),
-      backgroundColor: const Color.fromRGBO(0, 69, 118, 1),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: SingleChildScrollView(
-          child: Text(
-            _usageGuide,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              height: 1.5,
-            ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Text(
+          _usageGuide,
+          style: TextStyle(
+            fontSize: 16 * _fontScale,
+            height: 1.5,
+            color: _getTextColor(),
           ),
         ),
       ),
