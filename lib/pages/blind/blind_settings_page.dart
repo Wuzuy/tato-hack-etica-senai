@@ -77,7 +77,7 @@ class _SettingsPageState extends State<SettingsPage> {
           },
         ),
       ),
-      body: SafeArea( // Adicionado o widget SafeArea para respeitar as áreas seguras
+      body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(

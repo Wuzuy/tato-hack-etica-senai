@@ -1,24 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geocoding/geocoding.dart' as geocoding;
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-
-import 'deaf_map_enterprise_page.dart'; // Importa a nova página empresarial
-import 'deaf_settings_page.dart'; // Importa a página de configurações
+import 'deaf_map_enterprise_page.dart';
 
 const String _fontScaleKey = 'fontScale';
 const String _colorSchemeKey = 'colorScheme';
-
-// Chave da API para OpenRouteService
-// A chave fornecida pelo usuário é para o OpenRouteService, não para o OSRM.
-// O OSRM é o motor de roteamento, mas o OpenRouteService é a plataforma que o usa.
-const String _openRouteServiceApiKey = 'eyJvcmciOiI1YjNjZmM5OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRkOGQ4YTEwOWE2ZTRmNjhiM2RiNDY4ODc3NTUzZDZlIiwiaCI6Im11cm11cjY0In0=';
 
 class DeafMapPage extends StatefulWidget {
   const DeafMapPage({super.key});
@@ -32,152 +24,142 @@ class _DeafMapPageState extends State<DeafMapPage> {
   final TextEditingController _addressController = TextEditingController();
   List<LatLng> _routePoints = [];
 
-  LatLng? _currentLocation;
-  bool _isTracingRoute = false;
+  LatLng _center = LatLng(-22.7884, -43.3101);
 
   double _fontScale = 1.0;
   String _colorScheme = 'Padrão';
+
+  final String _openRouteServiceApiKey = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjY1NDUyY2NkYTRlMzQ1NWI5ZDY5ZTA2NDMwOWNmMzljIiwiaCI6Im11cm11cjY0In0=';
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
-    _requestLocationPermissionAndGetLocation();
+    _getCurrentLocation();
   }
 
-  // Carrega as configurações de fonte e cores salvas no SharedPreferences
+  @override
+  void dispose() {
+    _addressController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _fontScale = prefs.getDouble(_fontScaleKey) ?? 1.0;
-      _colorScheme = prefs.getString(_colorSchemeKey) ?? 'Padrão';
-    });
+    if (mounted) {
+      setState(() {
+        _fontScale = prefs.getDouble(_fontScaleKey) ?? 1.0;
+        _colorScheme = prefs.getString(_colorSchemeKey) ?? 'Padrão';
+      });
+    }
   }
 
-  // Solicita permissões de localização e obtém a localização atual
-  Future<void> _requestLocationPermissionAndGetLocation() async {
+  Future<void> _getCurrentLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
-
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      // Exibe uma SnackBar para informar ao usuário que a localização está desativada
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Serviço de localização desativado.')),
-        );
-      }
-      return Future.error('Serviço de localização desativado.');
+      return;
     }
-
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        // Exibe uma SnackBar caso a permissão seja negada
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Permissão de localização negada.')),
-          );
-        }
-        return Future.error('Permissão de localização negada.');
+        return;
       }
     }
-
     if (permission == LocationPermission.deniedForever) {
-      // Exibe uma SnackBar informando que a permissão foi negada permanentemente
-      if (mounted) {
+      return;
+    }
+    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    if(mounted) {
+      setState(() {
+        _center = LatLng(position.latitude, position.longitude);
+        _routePoints = [_center];
+        _mapController.move(_center, 15.0);
+      });
+    }
+  }
+
+  Future<void> _searchAddressAndCreateRoute(String address) async {
+    if (address.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, insira um endereço.')),
+      );
+      return;
+    }
+
+    try {
+      List<geocoding.Location> locations = await geocoding.locationFromAddress(address);
+      if (locations.isNotEmpty) {
+        final LatLng destination = LatLng(locations.first.latitude, locations.first.longitude);
+        await _traceRouteByRoads(_center, destination);
+        if (mounted) {
+          setState(() {});
+          _mapController.move(destination, 15.0);
+        }
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Permissão de localização negada para sempre. Habilite nas configurações do aplicativo.')),
+          const SnackBar(content: Text('Não foi possível encontrar o endereço. Tente novamente.')),
         );
       }
-      return Future.error('Permissão de localização negada para sempre. Habilite nas configurações do aplicativo.');
-    }
-
-    _getCurrentLocation();
-  }
-
-  // Obtém a localização atual do usuário e move o mapa
-  Future<void> _getCurrentLocation() async {
-    try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      setState(() {
-        _currentLocation = LatLng(position.latitude, position.longitude);
-        _mapController.move(_currentLocation!, 15.0);
-      });
     } catch (e) {
-      print('Erro ao obter a localização: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Houve um erro ao processar o endereço.')),
+      );
     }
   }
 
-  // Traça a rota entre a localização atual e o endereço de destino usando OpenRouteService
-  Future<void> _traceRoute(String destinationAddress) async {
-    if (destinationAddress.isEmpty) return;
-
-    setState(() {
-      _isTracingRoute = true;
-      _routePoints = [];
+  Future<void> _traceRouteByRoads(LatLng start, LatLng end) async {
+    final url = Uri.parse('https://api.openrouteservice.org/v2/directions/foot-walking/geojson');
+    final body = jsonEncode({
+      "coordinates": [
+        [start.longitude, start.latitude],
+        [end.longitude, end.latitude]
+      ]
     });
-
     try {
-      List<geocoding.Location> locations = await geocoding.locationFromAddress(destinationAddress);
-      if (locations.isNotEmpty && _currentLocation != null) {
-        final destination = LatLng(locations.first.latitude, locations.first.longitude);
-
-        // URL da API do OpenRouteService
-        final apiUrl = 'https://api.openrouteservice.org/v2/directions/driving-car';
-        final body = json.encode({
-          'coordinates': [
-            [_currentLocation!.longitude, _currentLocation!.latitude],
-            [destination.longitude, destination.latitude]
-          ]
-        });
-
-        final response = await http.post(
-          Uri.parse(apiUrl),
-          headers: {
-            'Authorization': _openRouteServiceApiKey,
-            'Content-Type': 'application/json',
-          },
-          body: body,
-        );
-
-        if (response.statusCode == 200) {
-          final data = json.decode(utf8.decode(response.bodyBytes));
-          final route = data['routes'][0]['geometry']['coordinates'] as List;
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': _openRouteServiceApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: body,
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final coords = data['features'][0]['geometry']['coordinates'] as List;
+        List<LatLng> points = coords
+            .map((c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
+            .toList();
+        if (mounted) {
           setState(() {
-            _routePoints = route.map((e) => LatLng(e[1], e[0])).toList();
-            _mapController.fitBounds(
-              LatLngBounds(_currentLocation!, destination),
-              options: const FitBoundsOptions(padding: EdgeInsets.all(50)),
-            );
+            _routePoints = points;
           });
-        } else {
-          print('Erro na API do OpenRouteService: ${response.statusCode} - ${response.body}');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Erro ao traçar a rota. Verifique o endereço e a chave da API.')),
-            );
-          }
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao traçar rota: ${response.statusCode}')),
+        );
+        if (mounted) {
+          setState(() {
+            _routePoints = [start, end];
+          });
         }
       }
     } catch (e) {
-      print('Erro ao traçar a rota: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erro na conexão com o serviço de rotas.')),
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao traçar a rota. Tente novamente.')),
-        );
+        setState(() {
+          _routePoints = [start, end];
+        });
       }
-    } finally {
-      setState(() {
-        _isTracingRoute = false;
-      });
     }
   }
 
-  // Retorna a cor primária baseada no esquema de cores selecionado
   Color _getPrimaryColor() {
     switch (_colorScheme) {
       case 'Alto Contraste':
@@ -195,17 +177,18 @@ class _DeafMapPageState extends State<DeafMapPage> {
     }
   }
 
-  // Retorna a cor de fundo do Scaffold baseada no esquema de cores
   Color _getScaffoldBackgroundColor() {
     return _colorScheme == 'Modo Escuro' ? Colors.grey[900]! : Colors.white;
   }
 
-  // Retorna a cor do cartão da barra de pesquisa baseada no esquema de cores
+  Color _getAppBarIconColor() {
+    return _colorScheme == 'Alto Contraste' || _colorScheme == 'Modo Escuro' ? Colors.white : Colors.white;
+  }
+
   Color _getCardColor() {
     return _colorScheme == 'Modo Escuro' ? Colors.grey[850]! : Colors.white;
   }
 
-  // Retorna a cor do texto baseada no esquema de cores
   Color _getTextColor() {
     return _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black;
   }
@@ -213,130 +196,117 @@ class _DeafMapPageState extends State<DeafMapPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _getScaffoldBackgroundColor(),
       appBar: AppBar(
         backgroundColor: _getPrimaryColor(),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: _getAppBarIconColor(), size: 24 * _fontScale),
           onPressed: () {
             Navigator.of(context).pop();
           },
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: () async {
-              // Navega para a página de configurações e espera o retorno
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const DeafSettingsPage(),
-                ),
-              );
-              // Recarrega as configurações quando o usuário retorna da página de configurações
-              _loadSettings();
-            },
+            icon: Icon(Icons.my_location, color: _getAppBarIconColor(), size: 24 * _fontScale),
+            onPressed: _getCurrentLocation,
+            tooltip: 'Centralizar',
           ),
         ],
       ),
-      backgroundColor: _getScaffoldBackgroundColor(),
       body: SafeArea(
         child: Stack(
-          children: [
+          children: <Widget>[
             FlutterMap(
-              options: MapOptions(
-                center: _currentLocation ?? const LatLng(-23.5505, -46.6333),
-                zoom: 15.0,
-              ),
               mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _center,
+                initialZoom: 15.0,
+              ),
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.app',
+                  userAgentPackageName: 'com.example.tato',
                 ),
-                if (_currentLocation != null)
-                  MarkerLayer(
-                    markers: [
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: _routePoints,
+                      strokeWidth: 5.0,
+                      color: Colors.blue,
+                    ),
+                  ],
+                ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _center,
+                      child: Icon(Icons.location_on, color: Colors.red, size: 40 * _fontScale),
+                    ),
+                    if (_routePoints.length > 1)
                       Marker(
-                        width: 80.0,
-                        height: 80.0,
-                        point: _currentLocation!,
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.red,
-                          size: 40.0,
-                        ),
+                        point: _routePoints.last,
+                        child: Icon(Icons.location_on, color: Colors.blue, size: 40 * _fontScale),
                       ),
-                    ],
-                  ),
-                if (_routePoints.isNotEmpty)
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: _routePoints,
-                        color: Colors.blue,
-                        strokeWidth: 5.0,
-                      ),
-                    ],
-                  ),
+                  ],
+                ),
               ],
             ),
-            // Barra de pesquisa
             Positioned(
-              bottom: 16.0,
-              left: 16.0,
-              right: 16.0,
+              bottom: 20,
+              left: 20,
+              right: 20,
               child: Card(
-                color: _getCardColor(), // APLICAÇÃO DA COR CORRIGIDA
+                color: _getCardColor(),
                 elevation: 4,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                   child: Row(
                     children: [
                       Expanded(
-                        child: TextField(
+                        child: TextFormField(
                           controller: _addressController,
+                          style: TextStyle(fontSize: 18 * _fontScale, color: _getTextColor()),
                           decoration: InputDecoration(
-                            hintText: 'Pesquisar endereço...',
-                            border: InputBorder.none,
-                            hintStyle: TextStyle(
-                              color: _getTextColor().withOpacity(0.5),
+                            hintText: 'Digite um endereço',
+                            hintStyle: TextStyle(color: _getTextColor().withOpacity(0.5)),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: _getTextColor().withOpacity(0.2)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: _getPrimaryColor()),
                             ),
                           ),
-                          style: TextStyle(
-                            color: _getTextColor(),
-                            fontSize: 16 * _fontScale,
-                          ),
-                          onSubmitted: (value) => _traceRoute(value),
                         ),
                       ),
-                      _isTracingRoute
-                          ? SizedBox(
-                        height: 30,
-                        width: 30,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(_getPrimaryColor()),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _getPrimaryColor(),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
-                      )
-                          : IconButton(
-                        icon: Icon(Icons.search, color: _getPrimaryColor()),
-                        onPressed: () => _traceRoute(_addressController.text),
+                        onPressed: () {
+                          _searchAddressAndCreateRoute(_addressController.text);
+                        },
+                        child: Icon(Icons.search, color: Colors.white, size: 24 * _fontScale),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
-            // Botão para ir para a página empresarial
             Positioned(
-              bottom: 80.0,
-              right: 16.0,
+              bottom: 120,
+              right: 20,
               child: FloatingActionButton(
-                heroTag: 'enterpriseBtn',
-                mini: false,
                 backgroundColor: _getPrimaryColor(),
                 onPressed: () {
                   Navigator.of(context).push(
@@ -345,7 +315,7 @@ class _DeafMapPageState extends State<DeafMapPage> {
                     ),
                   );
                 },
-                child: const Icon(Icons.business, color: Colors.white, size: 30),
+                child: Icon(Icons.business, color: _getAppBarIconColor(), size: 24 * _fontScale),
               ),
             ),
           ],

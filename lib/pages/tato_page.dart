@@ -8,7 +8,7 @@ class TATOPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color.fromRGBO(0, 69, 118, 1),
-      body: SafeArea( // Adicionado o widget SafeArea para respeitar as áreas seguras
+      body: SafeArea(
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

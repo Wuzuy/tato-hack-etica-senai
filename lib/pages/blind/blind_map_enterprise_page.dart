@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -26,6 +25,10 @@ class _BlindMapEnterprisePageState extends State<BlindMapEnterprisePage> {
   bool _isListening = false;
   String _lastWords = '';
 
+  String _listeningText = "Escutando";
+  Timer? _typingTimer;
+  int _dotCount = 0;
+
   double _fontScale = 1.0;
   String _colorScheme = 'Padrão';
 
@@ -43,6 +46,7 @@ class _BlindMapEnterprisePageState extends State<BlindMapEnterprisePage> {
   void dispose() {
     _flutterTts.stop();
     _speech.stop();
+    _typingTimer?.cancel();
     super.dispose();
   }
 
@@ -70,10 +74,18 @@ class _BlindMapEnterprisePageState extends State<BlindMapEnterprisePage> {
     bool available = await _speech.initialize(
       onStatus: (status) {
         debugPrint('Speech status: $status');
-        if (status == stt.SpeechToText.listeningStatus) {
-          setState(() => _isListening = true);
-        } else {
-          setState(() => _isListening = false);
+        if (mounted) {
+          if (status == stt.SpeechToText.listeningStatus) {
+            setState(() {
+              _isListening = true;
+              _startTypingAnimation();
+            });
+          } else {
+            setState(() {
+              _isListening = false;
+              _stopTypingAnimation();
+            });
+          }
         }
       },
       onError: (error) => debugPrint('Speech error: $error'),
@@ -81,6 +93,24 @@ class _BlindMapEnterprisePageState extends State<BlindMapEnterprisePage> {
     if (!available) {
       _flutterTts.speak("O reconhecimento de voz não está disponível neste dispositivo.");
     }
+  }
+
+  void _startTypingAnimation() {
+    _dotCount = 0;
+    _typingTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      if (mounted) {
+        setState(() {
+          _dotCount = (_dotCount + 1) % 4; // Ciclo de 0 a 3 pontos
+          _listeningText = "Escutando" + "." * _dotCount;
+        });
+      }
+    });
+  }
+
+  void _stopTypingAnimation() {
+    _typingTimer?.cancel();
+    _listeningText = "Escutando";
+    _dotCount = 0;
   }
 
   void _startListening() async {
@@ -227,7 +257,6 @@ class _BlindMapEnterprisePageState extends State<BlindMapEnterprisePage> {
       body: SafeArea(
         child: Stack(
           children: <Widget>[
-            // Imagem estática do mapa
             Positioned.fill(
               child: Image.asset(
                 'images/mapa.png',
@@ -245,7 +274,6 @@ class _BlindMapEnterprisePageState extends State<BlindMapEnterprisePage> {
                 },
               ),
             ),
-            // Stack de botões na parte inferior da tela
             Positioned(
               bottom: 20,
               left: 20,
@@ -254,10 +282,9 @@ class _BlindMapEnterprisePageState extends State<BlindMapEnterprisePage> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // Botão de SOS
                   SizedBox(
-                    width: 64.0, // Define a largura do botão quadrado
-                    height: 64.0, // Define a altura do botão quadrado
+                    width: 64.0,
+                    height: 64.0,
                     child: Card(
                       color: Colors.red[800],
                       elevation: 4,
@@ -303,16 +330,14 @@ class _BlindMapEnterprisePageState extends State<BlindMapEnterprisePage> {
                           children: [
                             Icon(
                               _isListening ? Icons.mic_off : Icons.mic,
-                              color: _isListening
-                                  ? Colors.red
-                                  : _getMicIconColor(),
+                              color: _isListening ? Colors.red : _getMicIconColor(),
                               size: 36 * _fontScale,
                             ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: Text(
                                 _isListening
-                                    ? "Ouvindo..."
+                                    ? _listeningText
                                     : (_lastWords.isEmpty ? "Toque para falar" : _lastWords),
                                 style: TextStyle(fontSize: 18 * _fontScale, color: _getTextColor()),
                                 textAlign: TextAlign.center,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,11 +22,25 @@ class _VoiceTranscriptionDeafPageState extends State<VoiceTranscriptionDeafPage>
   double _fontScale = 1.0;
   String _colorScheme = 'Padrão';
 
+  GenerativeModel? _generativeModel;
+  String _optimizedText = '';
+
   @override
   void initState() {
     super.initState();
     _loadSettings();
     _initSpeechToText();
+    _initGenerativeModel();
+  }
+
+  Future<void> _initGenerativeModel() async {
+    const apiKey = "AIzaSyDmc2PD3EaNvSfd5iY3Mn_iTtX1_0CpDfI";
+    if (apiKey.isEmpty) {
+      print("API Key não configurada para o Gemini.");
+      return;
+    }
+    _generativeModel = GenerativeModel(model: 'gemini', apiKey: apiKey);
+    print("API Key carregada com sucesso.");
   }
 
   @override
@@ -34,7 +49,6 @@ class _VoiceTranscriptionDeafPageState extends State<VoiceTranscriptionDeafPage>
     super.dispose();
   }
 
-  // Carrega as configurações de fonte e cores salvas no SharedPreferences
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -43,7 +57,6 @@ class _VoiceTranscriptionDeafPageState extends State<VoiceTranscriptionDeafPage>
     });
   }
 
-  // Inicializa o serviço de reconhecimento de voz
   Future<void> _initSpeechToText() async {
     bool available = await _speechToText.initialize();
     if (!available) {
@@ -55,16 +68,22 @@ class _VoiceTranscriptionDeafPageState extends State<VoiceTranscriptionDeafPage>
     }
   }
 
-  // Alterna o estado de escuta do microfone
   void _toggleListening() {
     if (_isListening) {
       _speechToText.stop();
       setState(() {
         _isListening = false;
       });
+
+      if (_transcribedText.isNotEmpty) {
+      _generateOptimizedText(_transcribedText);
+      _transcribedText = _optimizedText;
+      }
+
     } else {
       if (_speechToText.isAvailable) {
-        _transcribedText = ''; // Limpa o texto anterior ao iniciar
+        _transcribedText = '';
+        _optimizedText = '';
         _speechToText.listen(
           onResult: (result) {
             if (mounted) {
@@ -89,7 +108,46 @@ class _VoiceTranscriptionDeafPageState extends State<VoiceTranscriptionDeafPage>
     }
   }
 
-  // Retorna a cor primária baseada no esquema de cores selecionado
+  Future<void> _generateOptimizedText(String textToOptimize) async {
+    if (_generativeModel == null) {
+      print("Modelo generativo não inicializado.");
+      setState(() {
+        _optimizedText = "Erro: Modelo generativo não disponível.";
+      });
+      return;
+    }
+
+    if (textToOptimize.trim().isEmpty) {
+      setState(() {
+        _optimizedText = '';
+      });
+      return;
+    }
+
+    setState(() {
+      _optimizedText = "Otimizando...";
+    });
+
+    try {
+      final prompt = 'Por favor, corrija a gramática e melhore a clareza da seguinte frase, mantendo o significado e seguindo a maneira de fala do usuário. Se a frase estiver vazia, retorne a frase original novamente. Frase: $textToOptimize ';
+      final content = [Content.text(prompt)];
+      final response = await _generativeModel!.generateContent(content);
+
+      if (mounted) {
+        setState(() {
+          _optimizedText = response.text ?? "Não foi possível gerar o texto otimizado.";
+        });
+      }
+    } catch (e) {
+      print("Erro ao otimizar o texto com o google_generative_ai: $e");
+      if (mounted) {
+        setState(() {
+          _optimizedText = "Erro: Não foi possível otimizar o texto.";
+        });
+      }
+    }
+  }
+
   Color _getPrimaryColor() {
     switch (_colorScheme) {
       case 'Alto Contraste':
@@ -107,12 +165,10 @@ class _VoiceTranscriptionDeafPageState extends State<VoiceTranscriptionDeafPage>
     }
   }
 
-  // Retorna a cor de fundo do Scaffold baseada no esquema de cores
   Color _getScaffoldBackgroundColor() {
     return _colorScheme == 'Modo Escuro' ? Colors.grey[900]! : Colors.white;
   }
 
-  // Retorna a cor do texto baseada no esquema de cores
   Color _getTextColor() {
     return _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black;
   }
@@ -131,14 +187,13 @@ class _VoiceTranscriptionDeafPageState extends State<VoiceTranscriptionDeafPage>
           },
         ),
       ),
-      body: SafeArea( // Adicionado o widget SafeArea para respeitar as áreas seguras
+      body: SafeArea(
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                // Botão do microfone
                 InkWell(
                   onTap: _toggleListening,
                   borderRadius: BorderRadius.circular(100),
@@ -153,7 +208,6 @@ class _VoiceTranscriptionDeafPageState extends State<VoiceTranscriptionDeafPage>
                   ),
                 ),
                 const SizedBox(height: 20),
-                // Texto de instrução
                 Text(
                   _isListening ? 'Ouvindo...' : 'Aperte o botão para captar voz',
                   style: GoogleFonts.poppins(
@@ -164,7 +218,6 @@ class _VoiceTranscriptionDeafPageState extends State<VoiceTranscriptionDeafPage>
                   ),
                 ),
                 const SizedBox(height: 40),
-                // Área de transcrição
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Column(

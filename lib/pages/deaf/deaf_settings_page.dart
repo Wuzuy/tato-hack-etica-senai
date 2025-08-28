@@ -22,7 +22,6 @@ class _DeafSettingsPageState extends State<DeafSettingsPage> {
     _loadSettings();
   }
 
-  // Carrega as configurações salvas no SharedPreferences
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -31,14 +30,12 @@ class _DeafSettingsPageState extends State<DeafSettingsPage> {
     });
   }
 
-  // Salva as configurações no SharedPreferences
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_fontScaleKey, _fontScale);
     await prefs.setString(_colorSchemeKey, _colorScheme);
   }
 
-  // Retorna a cor primária baseada no esquema de cores selecionado
   Color _getPrimaryColor() {
     switch (_colorScheme) {
       case 'Alto Contraste':
@@ -56,12 +53,10 @@ class _DeafSettingsPageState extends State<DeafSettingsPage> {
     }
   }
 
-  // Retorna a cor de fundo do Scaffold baseada no esquema de cores
   Color _getScaffoldBackgroundColor() {
     return _colorScheme == 'Modo Escuro' ? Colors.grey[900]! : Colors.white;
   }
 
-  // Retorna a cor do texto baseada no esquema de cores
   Color _getTextColor() {
     return _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black;
   }

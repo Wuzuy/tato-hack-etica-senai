@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'blind/blind_map_page.dart';
-import 'deaf/deaf_map_page.dart'; // Importação corrigida para a nova página
+import 'deaf/deaf_map_page.dart';
 
 class SecondPage extends StatelessWidget {
   const SecondPage({super.key});
@@ -29,13 +29,13 @@ class SecondPage extends StatelessWidget {
                 'images/tato_logo.png',
                 height: 300,
               ),
-              const SizedBox(height: 24), // Espaçamento reduzido
+              const SizedBox(height: 24),
               const Text(
-                'Qual versão do aplicativo mais se\naplica à sua necessidade?',
+                'Qual versão do aplicativo mais se aplica à sua necessidade?',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 22,
-                  fontWeight: FontWeight.bold, // Adicionado negrito
+                  fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -52,18 +52,18 @@ class SecondPage extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (context) => const DeafMapPage(), // Navegação corrigida para DeafMapPage
+                          builder: (context) => const DeafMapPage(),
                         ),
                       );
                     },
                     child: const Padding(
-                      padding: EdgeInsets.all(16.0), // Espaçamento interno reduzido
+                      padding: EdgeInsets.all(16.0),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.hearing,
                               size: 40, color: Color.fromRGBO(0, 69, 118, 1)),
-                          SizedBox(width: 16), // Espaçamento reduzido
+                          SizedBox(width: 16),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -75,12 +75,12 @@ class SecondPage extends StatelessWidget {
                                   color: Color.fromRGBO(0, 69, 118, 1),
                                 ),
                               ),
-                              SizedBox(height: 2), // Espaçamento reduzido
+                              SizedBox(height: 2),
                               Text(
                                 'Interface visual otimizada',
                                 style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold, // Adicionado negrito
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                   color: Color.fromRGBO(0, 69, 118, 1),
                                 ),
                               ),
@@ -92,7 +92,7 @@ class SecondPage extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 16), // Espaçamento reduzido
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: Card(
@@ -110,13 +110,13 @@ class SecondPage extends StatelessWidget {
                       );
                     },
                     child: const Padding(
-                      padding: EdgeInsets.all(16.0), // Espaçamento interno reduzido
+                      padding: EdgeInsets.all(16.0),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.visibility,
                               size: 40, color: Color.fromRGBO(0, 69, 118, 1)),
-                          SizedBox(width: 16), // Espaçamento reduzido
+                          SizedBox(width: 16),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -128,12 +128,12 @@ class SecondPage extends StatelessWidget {
                                   color: Color.fromRGBO(0, 69, 118, 1),
                                 ),
                               ),
-                              SizedBox(height: 2), // Espaçamento reduzido
+                              SizedBox(height: 2), 
                               Text(
                                 'Interface com áudio e vibração',
                                 style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold, // Adicionado negrito
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                   color: Color.fromRGBO(0, 69, 118, 1),
                                 ),
                               ),

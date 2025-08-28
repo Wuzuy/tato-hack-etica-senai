@@ -25,7 +25,7 @@ class _ChatPageState extends State<ChatPage> {
   String _colorScheme = 'Padrão';
   String _lastWords = '';
 
-  List<Map<String, String>> _messages = [
+  List<Map<String, String>> get _messages => [
     {'sender': 'Equipe de Apoio', 'text': 'Olá! Como posso ajudar você?'},
   ];
 
@@ -36,7 +36,7 @@ class _ChatPageState extends State<ChatPage> {
     _initTts();
     _readLastMessage();
     _speech = stt.SpeechToText();
-    _initializeSpeech(); // Chama o método de inicialização
+    _initializeSpeech();
   }
 
   @override

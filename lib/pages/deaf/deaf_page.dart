@@ -17,8 +17,8 @@ class _DeafPageState extends State<DeafPage> {
   final MapController _mapController = MapController();
 
   List<Marker> _markers = [];
-  final LatLng _userLocation = LatLng(-22.7884, -43.3101); // Localização de exemplo (SENAI Caxias)
-  final LatLng _senaiLocation = LatLng(-22.7884, -43.3101); // Exemplo de um local na empresa
+  final LatLng _userLocation = LatLng(-22.7884, -43.3101);
+  final LatLng _senaiLocation = LatLng(-22.7884, -43.3101);
 
   @override
   void initState() {
@@ -124,7 +124,6 @@ class _DeafPageState extends State<DeafPage> {
       ),
       body: Stack(
         children: <Widget>[
-          // Mapa da Empresa
           FlutterMap(
             mapController: _mapController,
             options: const MapOptions(
@@ -140,7 +139,6 @@ class _DeafPageState extends State<DeafPage> {
             ],
           ),
 
-          // Campo de pesquisa
           Positioned(
             top: 20,
             left: 20,
@@ -175,14 +173,12 @@ class _DeafPageState extends State<DeafPage> {
             ),
           ),
 
-          // Botões de ação
           Positioned(
             bottom: 20,
             right: 20,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // Botão de chat
                 FloatingActionButton(
                   heroTag: 'chatButton',
                   backgroundColor: const Color.fromRGBO(0, 69, 118, 1),
@@ -190,7 +186,6 @@ class _DeafPageState extends State<DeafPage> {
                   child: const Icon(Icons.chat, color: Colors.white),
                 ),
                 const SizedBox(height: 10),
-                // Botão de SOS
                 FloatingActionButton(
                   heroTag: 'sosButton',
                   backgroundColor: Colors.red,
