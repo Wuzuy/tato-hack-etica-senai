@@ -1,12 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-
-import 'blind_usage_guide_page.dart';
-import 'blind_chat_page.dart';
-import 'blind_settings_page.dart';
 
 class SosPage extends StatefulWidget {
   const SosPage({super.key});
@@ -21,10 +15,6 @@ class _SosPageState extends State<SosPage> {
   bool _isListening = false;
   String _lastWords = 'Toque para falar.';
 
-  String _listeningText = "Ouvindo";
-  Timer? _typingTimer;
-  int _dotCount = 0;
-
   @override
   void initState() {
     super.initState();
@@ -37,7 +27,6 @@ class _SosPageState extends State<SosPage> {
   void dispose() {
     _flutterTts.stop();
     _speech.stop();
-    _typingTimer?.cancel();
     super.dispose();
   }
 
@@ -50,50 +39,13 @@ class _SosPageState extends State<SosPage> {
 
   Future<void> _initSpeechToText() async {
     _speech = stt.SpeechToText();
-    bool available = await _speech.initialize(
-      onStatus: (status) {
-        if (mounted) {
-          if (status == stt.SpeechToText.listeningStatus) {
-            setState(() {
-              _isListening = true;
-              _startTypingAnimation();
-            });
-          } else {
-            setState(() {
-              _isListening = false;
-              _stopTypingAnimation();
-            });
-          }
-        }
-      },
-      onError: (errorNotification) => print('onError: $errorNotification'),
-    );
+    bool available = await _speech.initialize();
     if (!available) {
-      if (mounted) {
-        setState(() {
-          _lastWords = 'O serviço de reconhecimento de voz não está disponível.';
-        });
-      }
+      setState(() {
+        _lastWords = 'O serviço de reconhecimento de voz não está disponível.';
+      });
       _speak(_lastWords);
     }
-  }
-
-  void _startTypingAnimation() {
-    _dotCount = 0;
-    _typingTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      if (mounted) {
-        setState(() {
-          _dotCount = (_dotCount + 1) % 4;
-          _listeningText = "Ouvindo" + "." * _dotCount;
-        });
-      }
-    });
-  }
-
-  void _stopTypingAnimation() {
-    _typingTimer?.cancel();
-    _listeningText = "Ouvindo";
-    _dotCount = 0;
   }
 
   Future<void> _speak(String text) async {
@@ -103,26 +55,35 @@ class _SosPageState extends State<SosPage> {
   }
 
   void _startListening() async {
-    _speech.listen(
-      onResult: (result) {
-        if (mounted) {
-          setState(() {
-            _lastWords = result.recognizedWords;
-          });
-        }
-        if (result.finalResult) {
-          _processVoiceCommand(_lastWords);
-          _stopListening();
-        }
-      },
-      localeId: 'pt_BR',
-      listenFor: const Duration(seconds: 10),
-      onSoundLevelChange: (level) => print('onSoundLevelChange: $level'),
-    );
+    if (!_isListening) {
+      bool available = await _speech.initialize(
+        onStatus: (status) => print('onStatus: $status'),
+        onError: (errorNotification) => print('onError: $errorNotification'),
+      );
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(
+          onResult: (result) {
+            setState(() {
+              _lastWords = result.recognizedWords;
+            });
+            if (result.finalResult) {
+              _speak('Você disse: $_lastWords');
+              _stopListening();
+            }
+          },
+          listenFor: const Duration(seconds: 10),
+          onSoundLevelChange: (level) => print('onSoundLevelChange: $level'),
+        );
+      }
+    }
   }
 
   void _stopListening() {
-    _speech.stop();
+    if (_isListening) {
+      _speech.stop();
+      setState(() => _isListening = false);
+    }
   }
 
   void _toggleListening() {
@@ -131,44 +92,6 @@ class _SosPageState extends State<SosPage> {
     } else {
       _startListening();
     }
-  }
-
-  void _processVoiceCommand(String command) {
-    String normalizedCommand = command.toLowerCase().trim();
-
-    if (normalizedCommand.contains('abrir mapa') || normalizedCommand.contains('voltar')) {
-      _speak('Voltando para o mapa.');
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } else if (normalizedCommand.contains('guia')) {
-      _navigateToUsageGuidePage();
-    } else if (normalizedCommand.contains('chat')) {
-      _navigateToChatPage();
-    } else if (normalizedCommand.contains('configurações') || normalizedCommand.contains('ajustes')) {
-      _navigateToSettingsPage();
-    } else {
-      _speak("Comando não reconhecido. Por favor, toque novamente e tente outra vez.");
-    }
-  }
-
-  void _navigateToUsageGuidePage() {
-    _flutterTts.stop();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const UsageGuidePage()),
-    );
-  }
-
-  void _navigateToChatPage() {
-    _flutterTts.stop();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const ChatPage()),
-    );
-  }
-
-  void _navigateToSettingsPage() {
-    _flutterTts.stop();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const SettingsPage()),
-    );
   }
 
   @override
@@ -208,7 +131,7 @@ class _SosPageState extends State<SosPage> {
               ),
               const SizedBox(height: 40),
               Text(
-                _isListening ? _listeningText : _lastWords,
+                _lastWords,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 18,
@@ -220,29 +143,19 @@ class _SosPageState extends State<SosPage> {
               ElevatedButton(
                 onPressed: _toggleListening,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.red,
+                  backgroundColor: _isListening ? Colors.red[900] : Colors.white,
+                  foregroundColor: _isListening ? Colors.white : Colors.red,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.mic,
-                      color: _isListening ? Colors.red : Colors.red,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _isListening ? _listeningText : 'Toque para Falar',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  _isListening ? 'Ouvindo...' : 'Toque para Falar',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(height: 40),

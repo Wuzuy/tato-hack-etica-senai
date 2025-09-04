@@ -36,18 +36,12 @@ class _BlindMapPageState extends State<BlindMapPage> {
   bool _isListening = false;
   String _lastWords = '';
 
-  // Variáveis para a animação de digitação
-  String _listeningText = "Ouvindo";
-  Timer? _typingTimer;
-  int _dotCount = 0;
-
   LatLng _center = LatLng(-22.7884, -43.3101);
 
   double _fontScale = 1.0;
   String _colorScheme = 'Padrão';
 
-  final String _openRouteServiceApiKey = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjY1NDUyY2NkYTRlMzQ1NWI5ZDY5ZTA2NDMwOWNmMzljIiwiaCI6Im11cm11cjY0In0=';
-
+  final String _openRouteServiceApiKey = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRkOGQ4YTEwOWE5ZTRmNjhiM2RiNDY4ODc3NTczZDZlIiwiaCI6Im11cm11cjY0In0=';
 
   @override
   void initState() {
@@ -64,7 +58,6 @@ class _BlindMapPageState extends State<BlindMapPage> {
   void dispose() {
     _flutterTts.stop();
     _addressController.dispose();
-    _typingTimer?.cancel(); // Certificar que o timer é cancelado
     super.dispose();
   }
 
@@ -93,15 +86,9 @@ class _BlindMapPageState extends State<BlindMapPage> {
       onStatus: (status) {
         debugPrint('Speech status: $status');
         if (status == stt.SpeechToText.listeningStatus) {
-          setState(() {
-            _isListening = true;
-            _startTypingAnimation(); // Iniciar a animação de digitação
-          });
+          setState(() => _isListening = true);
         } else {
-          setState(() {
-            _isListening = false;
-            _stopTypingAnimation(); // Parar a animação
-          });
+          setState(() => _isListening = false);
         }
       },
       onError: (error) => debugPrint('Speech error: $error'),
@@ -109,24 +96,6 @@ class _BlindMapPageState extends State<BlindMapPage> {
     if (!available) {
       _flutterTts.speak("O reconhecimento de voz não está disponível neste dispositivo.");
     }
-  }
-
-  void _startTypingAnimation() {
-    _dotCount = 0;
-    _typingTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      if (mounted) {
-        setState(() {
-          _dotCount = (_dotCount + 1) % 4; // Ciclo de 0 a 3 pontos
-          _listeningText = "Ouvindo" + "." * _dotCount;
-        });
-      }
-    });
-  }
-
-  void _stopTypingAnimation() {
-    _typingTimer?.cancel();
-    _listeningText = "Ouvindo";
-    _dotCount = 0;
   }
 
   Future<void> _getCurrentLocation() async {
@@ -192,10 +161,10 @@ class _BlindMapPageState extends State<BlindMapPage> {
       _navigateToChatPage();
     } else if (normalizedCommand.contains('configurações') || normalizedCommand.contains('ajustes')) {
       _navigateToSettingsPage();
-    } else if (normalizedCommand.contains('mapa')) {
+    } else if (normalizedCommand.contains('mapa empresarial')) {
       _navigateToBlindMapEnterprisePage();
     } else {
-      _searchAddressAndCreateRoute(normalizedCommand);
+      _flutterTts.speak("Comando não reconhecido. Por favor, tente novamente.");
     }
   }
 
@@ -213,7 +182,7 @@ class _BlindMapPageState extends State<BlindMapPage> {
         _flutterTts.speak("Não foi possível encontrar o endereço. Tente novamente.");
       }
     } catch (e) {
-      _flutterTts.speak("Houve um erro ao processar o endereço, aperte o botão e tente novamente");
+      _flutterTts.speak("Houve um erro ao processar o endereço.");
     }
   }
 
@@ -432,15 +401,15 @@ class _BlindMapPageState extends State<BlindMapPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.mic, // Ícone do microfone normal
-                          color: _isListening ? Colors.red : _getMicIconColor(), // Cor vermelha quando estiver a ouvir
+                          _isListening ? Icons.mic_off : Icons.mic,
+                          color: _isListening ? Colors.red : _getMicIconColor(),
                           size: 36 * _fontScale,
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Text(
                             _isListening
-                                ? _listeningText
+                                ? "Ouvindo..."
                                 : (_lastWords.isEmpty ? "Toque para falar" : _lastWords),
                             style: TextStyle(fontSize: 18 * _fontScale, color: _getTextColor()),
                             textAlign: TextAlign.center,

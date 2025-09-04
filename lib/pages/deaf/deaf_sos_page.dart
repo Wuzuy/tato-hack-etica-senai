@@ -25,6 +25,7 @@ class _DeafSosPageState extends State<DeafSosPage> {
     _loadSettings();
   }
 
+  // Carrega as configurações de fonte e cores salvas no SharedPreferences
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
@@ -35,6 +36,7 @@ class _DeafSosPageState extends State<DeafSosPage> {
     }
   }
 
+  // Retorna a cor primária baseada no esquema de cores selecionado
   Color _getPrimaryColor() {
     switch (_colorScheme) {
       case 'Alto Contraste':
@@ -52,14 +54,17 @@ class _DeafSosPageState extends State<DeafSosPage> {
     }
   }
 
+  // Retorna a cor de fundo do Scaffold baseada no esquema de cores
   Color _getScaffoldBackgroundColor() {
     return _colorScheme == 'Modo Escuro' ? Colors.grey[900]! : Colors.white;
   }
 
+  // Retorna a cor do texto baseada no esquema de cores
   Color _getTextColor() {
     return _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black;
   }
 
+  // Simula o envio de um alerta SOS
   Future<void> _sendSosAlert() async {
     if (_isLoading) return;
 

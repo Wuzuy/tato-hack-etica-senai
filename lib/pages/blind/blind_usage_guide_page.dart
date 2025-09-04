@@ -104,7 +104,7 @@ Diga: 'Tati, configurações' para acessar a aba de ajustes do app.
           },
         ),
       ),
-      body: SafeArea(
+      body: SafeArea( // Adicionado o widget SafeArea
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Text(

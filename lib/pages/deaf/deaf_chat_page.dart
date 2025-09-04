@@ -37,6 +37,7 @@ class _DeafChatPageState extends State<DeafChatPage> {
     super.dispose();
   }
 
+  // Carrega as configurações salvas no SharedPreferences
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -45,17 +46,20 @@ class _DeafChatPageState extends State<DeafChatPage> {
     });
   }
 
+  // Envia uma nova mensagem de texto para o chat
   void _sendMessage(String text) {
     if (text.isNotEmpty) {
       setState(() {
         _messages.add({'sender': 'Você', 'text': text});
       });
       _textController.clear();
+      // Rola para a última mensagem adicionada
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
+      // Simula a resposta da equipe após 2 segundos
       Future.delayed(const Duration(seconds: 2), () {
         setState(() {
           _messages.add({'sender': 'Equipe de Apoio', 'text': 'Resposta simulada'});
@@ -69,6 +73,7 @@ class _DeafChatPageState extends State<DeafChatPage> {
     }
   }
 
+  // Retorna a cor primária baseada no esquema de cores selecionado
   Color _getPrimaryColor() {
     switch (_colorScheme) {
       case 'Alto Contraste':
@@ -86,14 +91,17 @@ class _DeafChatPageState extends State<DeafChatPage> {
     }
   }
 
+  // Retorna a cor de fundo do Scaffold baseada no esquema de cores
   Color _getScaffoldBackgroundColor() {
     return _colorScheme == 'Modo Escuro' ? Colors.grey[900]! : Colors.white;
   }
 
+  // Retorna a cor do texto baseada no esquema de cores
   Color _getTextColor() {
     return _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black;
   }
 
+  // Retorna a cor do balão de mensagem para o usuário atual
   Color _getMessageBubbleColor(bool isMe) {
     if (isMe) {
       return _getPrimaryColor();
@@ -101,6 +109,7 @@ class _DeafChatPageState extends State<DeafChatPage> {
     return _colorScheme == 'Modo Escuro' ? Colors.grey[700]! : Colors.grey[300]!;
   }
 
+  // Retorna a cor do texto da mensagem
   Color _getMessageTextColor(bool isMe) {
     if (isMe) {
       return Colors.white;

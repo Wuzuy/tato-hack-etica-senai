@@ -36,7 +36,7 @@ class _ChatPageState extends State<ChatPage> {
     _initTts();
     _readLastMessage();
     _speech = stt.SpeechToText();
-    _initializeSpeech();
+    _initializeSpeech(); // Chama o método de inicialização
   }
 
   @override
@@ -205,7 +205,7 @@ class _ChatPageState extends State<ChatPage> {
           },
         ),
       ),
-      body: SafeArea(
+      body: SafeArea( // Adicionado o widget SafeArea
         child: Column(
           children: <Widget>[
             Expanded(
