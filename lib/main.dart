@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:tato/login_page.dart';
 import 'pages/tato_page.dart';
 
 void main() {
