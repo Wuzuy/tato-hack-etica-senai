@@ -4,6 +4,8 @@
     // Para obter mais informações, acesse: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "1.0.1",
     "configurations": [
+        
+        
         {
             "name": "tato-hack-etica-senai",
             "request": "launch",

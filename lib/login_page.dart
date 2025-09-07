@@ -29,6 +29,14 @@ class _LoginPageState extends State<LoginPage> {
       _isLoading = true;
     });
 
+    // Modo de depuração
+    if (_emailController.text == 'user' && _passwordController.text == 'user') {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const SecondPage()),
+      );
+      return;
+    }
+
     try {
       final user = await _authService.login(
         email: _emailController.text,

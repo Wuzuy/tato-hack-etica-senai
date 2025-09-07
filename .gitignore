@@ -1,4 +1,5 @@
 # Miscellaneous
+gemini.env
 *.class
 *.log
 *.pyc

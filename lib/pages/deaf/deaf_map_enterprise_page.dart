@@ -94,22 +94,32 @@ class _DeafMapEnterprisePageState extends State<DeafMapEnterprisePage> {
         child: Stack(
           children: [
             Positioned.fill(
-              child: Image.asset(
-                'images/mapa.png',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey,
-                    child: Center(
-                      child: Text(
-                        'Erro ao carregar a imagem do mapa. Verifique a configuração do pubspec.yaml e a pasta images.',
-                        style: GoogleFonts.poppins(
-                          textStyle: TextStyle(color: _getTextColor()),
+              child: InteractiveViewer(
+                panEnabled: true,
+                scaleEnabled: true,
+                minScale: 1.0,
+                maxScale: 3.0,
+                child: Image.asset(
+                  'images/mapa.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey,
+                      child: Center(
+                        child: Text(
+                          'Erro ao carregar a imagem do mapa. Verifique a configuração do pubspec.yaml e a pasta images.',
+                          style: GoogleFonts.poppins(
+                            textStyle: TextStyle(
+                              color: _getTextColor(),
+                              fontSize: 14 * _fontScale,
+                            ),
+                          ),
+                          textAlign: TextAlign.center,
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
 
@@ -132,7 +142,11 @@ class _DeafMapEnterprisePageState extends State<DeafMapEnterprisePage> {
                         ),
                       );
                     },
-                    child: const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 30),
+                    child: const Icon(
+                      Icons.chat_bubble_outline,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   FloatingActionButton(
@@ -142,7 +156,8 @@ class _DeafMapEnterprisePageState extends State<DeafMapEnterprisePage> {
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (context) => const VoiceTranscriptionDeafPage(),
+                          builder: (context) =>
+                              const VoiceTranscriptionDeafPage(),
                         ),
                       );
                     },
