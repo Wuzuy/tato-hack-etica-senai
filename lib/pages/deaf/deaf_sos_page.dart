@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart'; // Importe para usar GoogleFonts
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:tato/settings_page.dart';
+import 'package:tato/services/settings_service.dart';
+import 'package:tato/utils/app_theme.dart';
 
-import 'deaf_settings_page.dart';
-
-const String _fontScaleKey = 'fontScale';
-const String _colorSchemeKey = 'colorScheme';
-
+/// Página de emergência para o fluxo de usuário "deaf".
 class DeafSosPage extends StatefulWidget {
   const DeafSosPage({super.key});
 
@@ -15,6 +13,10 @@ class DeafSosPage extends StatefulWidget {
 }
 
 class _DeafSosPageState extends State<DeafSosPage> {
+  // --- Serviços ---
+  final SettingsService _settingsService = SettingsService();
+
+  // --- Estado da UI ---
   double _fontScale = 1.0;
   String _colorScheme = 'Padrão';
   bool _isLoading = false;
@@ -22,71 +24,33 @@ class _DeafSosPageState extends State<DeafSosPage> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    _initializePage();
   }
 
-  // Carrega as configurações de fonte e cores salvas no SharedPreferences
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        _fontScale = prefs.getDouble(_fontScaleKey) ?? 1.0;
-        _colorScheme = prefs.getString(_colorSchemeKey) ?? 'Padrão';
-      });
-    }
+  /// Carrega as configurações da página usando o serviço.
+  Future<void> _initializePage() async {
+    _fontScale = await _settingsService.loadFontScale();
+    _colorScheme = await _settingsService.loadColorScheme();
+    if (mounted) setState(() {});
   }
 
-  // Retorna a cor primária baseada no esquema de cores selecionado
-  Color _getPrimaryColor() {
-    switch (_colorScheme) {
-      case 'Alto Contraste':
-        return Colors.black;
-      case 'Protanopia':
-        return const Color.fromRGBO(85, 148, 179, 1);
-      case 'Deuteranopia':
-        return const Color.fromRGBO(179, 148, 85, 1);
-      case 'Tritanopia':
-        return const Color.fromRGBO(148, 85, 179, 1);
-      case 'Modo Escuro':
-        return Colors.blueGrey[800]!;
-      default:
-        return const Color.fromRGBO(0, 69, 118, 1);
-    }
-  }
-
-  // Retorna a cor de fundo do Scaffold baseada no esquema de cores
-  Color _getScaffoldBackgroundColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.grey[900]! : Colors.white;
-  }
-
-  // Retorna a cor do texto baseada no esquema de cores
-  Color _getTextColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black;
-  }
-
-  // Simula o envio de um alerta SOS
+  /// Simula o envio de um alerta SOS.
   Future<void> _sendSosAlert() async {
     if (_isLoading) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     // Simula uma requisição de rede
     await Future.delayed(const Duration(seconds: 2));
 
     if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             'Alerta de Socorro enviado com sucesso!',
             style: GoogleFonts.poppins(
-              textStyle: TextStyle(
-                fontSize: 16 * _fontScale,
-              ),
+              textStyle: TextStyle(fontSize: 16 * _fontScale),
             ),
           ),
           backgroundColor: Colors.green,
@@ -98,26 +62,21 @@ class _DeafSosPageState extends State<DeafSosPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _getScaffoldBackgroundColor(),
+      backgroundColor: AppTheme.getScaffoldBackgroundColor(_colorScheme),
       appBar: AppBar(
-        backgroundColor: _getPrimaryColor(),
+        backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
+          onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const DeafSettingsPage(),
-                ),
-              );
-              _loadSettings();
+            onPressed: () {
+              Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (context) => const SettingsPage(useGoogleFonts: true)))
+                  .then((_) => _initializePage()); // Recarrega as configurações ao voltar
             },
           ),
         ],
@@ -133,7 +92,7 @@ class _DeafSosPageState extends State<DeafSosPage> {
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   textStyle: TextStyle(
-                    color: _getTextColor(),
+                    color: AppTheme.getMessageTextColor(_colorScheme, false),
                     fontSize: 20 * _fontScale,
                     fontWeight: FontWeight.bold,
                   ),
@@ -144,7 +103,7 @@ class _DeafSosPageState extends State<DeafSosPage> {
                 width: 200,
                 height: 200,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : () => _sendSosAlert(),
+                  onPressed: _isLoading ? null : _sendSosAlert,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red[800],
                     shape: const CircleBorder(),

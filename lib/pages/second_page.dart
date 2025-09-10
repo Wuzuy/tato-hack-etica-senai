@@ -31,7 +31,7 @@ class SecondPage extends StatelessWidget {
               ),
               const SizedBox(height: 24), // Espaçamento reduzido
               const Text(
-                'Qual versão do aplicativo mais se\naplica à sua necessidade?',
+                'Qual versão do aplicativo mais se aplica à sua necessidade?',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 22,

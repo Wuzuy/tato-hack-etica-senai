@@ -14,8 +14,6 @@ class TATOPage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Você deve ter a imagem 'tato_logo.png' em 'assets/images/'
-              // e ter a pasta 'assets/images' declarada no pubspec.yaml.
               Image.asset(
                 'images/tato_logo.png',
                 height: 300,
@@ -24,7 +22,6 @@ class TATOPage extends StatelessWidget {
               const SizedBox(height: 100),
               ElevatedButton(
                 onPressed: () {
-                  // Navega para a LoginPage em vez de ir direto para a SecondPage.
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (context) => const LoginPage(),

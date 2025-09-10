@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:tato/pages/second_page.dart';
 
-import 'database/auth_service.dart';
+// import 'database/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -14,7 +14,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final AuthService _authService = AuthService();
+  // final AuthService _authService = AuthService();
   bool _isLoading = false;
 
   @override
@@ -30,36 +30,42 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     // Modo de depuração
-    if (_emailController.text == 'user' && _passwordController.text == 'user') {
+    if (_emailController.text != '' && _passwordController.text != '') {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const SecondPage()),
       );
       return;
-    }
-
-    try {
-      final user = await _authService.login(
-        email: _emailController.text,
-        password: _passwordController.text,
-      );
-
+    } else {
+      _showLoginFailedMessage('Por favor, insira e-mail e senha.');
       setState(() {
         _isLoading = false;
       });
-
-      if (user != null) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const SecondPage()),
-        );
-      } else {
-        _showLoginFailedMessage('Login falhou. Verifique suas credenciais.');
-      }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      _showLoginFailedMessage('Erro ao fazer login: $e');
+      return;
     }
+
+    // try {
+    //   final user = await _authService.login(
+    //     email: _emailController.text,
+    //     password: _passwordController.text,
+    //   );
+
+    //   setState(() {
+    //     _isLoading = false;
+    //   });
+
+    //   if (user != null) {
+    //     Navigator.of(context).pushReplacement(
+    //       MaterialPageRoute(builder: (context) => const SecondPage()),
+    //     );
+    //   } else {
+    //     _showLoginFailedMessage('Login falhou. Verifique suas credenciais.');
+    //   }
+    // } catch (e) {
+    //   setState(() {
+    //     _isLoading = false;
+    //   });
+    //   _showLoginFailedMessage('Erro ao fazer login: $e');
+    // }
   }
 
   void _showLoginFailedMessage(String s) {

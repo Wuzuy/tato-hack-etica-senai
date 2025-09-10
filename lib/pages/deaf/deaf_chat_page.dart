@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-const String _fontScaleKey = 'fontScale';
-const String _colorSchemeKey = 'colorScheme';
+import 'package:tato/services/gemini_service.dart';
+import 'package:tato/services/settings_service.dart';
+import 'package:tato/utils/app_theme.dart';
 
 class DeafChatPage extends StatefulWidget {
   const DeafChatPage({super.key});
@@ -13,13 +12,16 @@ class DeafChatPage extends StatefulWidget {
 }
 
 class _DeafChatPageState extends State<DeafChatPage> {
+  // --- Serviços ---
+  final SettingsService _settingsService = SettingsService();
+  final GeminiService _geminiService = GeminiService();
+
+  // --- Controladores e Estado da UI ---
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-
   double _fontScale = 1.0;
   String _colorScheme = 'Padrão';
-
-  // Lista de mensagens do chat. Agora contém apenas texto.
+  bool _isLoading = false;
   List<Map<String, String>> _messages = [
     {'sender': 'Equipe de Apoio', 'text': 'Olá! Como posso ajudar você?'},
   ];
@@ -27,7 +29,7 @@ class _DeafChatPageState extends State<DeafChatPage> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    _initializePage();
   }
 
   @override
@@ -37,90 +39,55 @@ class _DeafChatPageState extends State<DeafChatPage> {
     super.dispose();
   }
 
-  // Carrega as configurações salvas no SharedPreferences
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+  /// Carrega as configurações usando o serviço.
+  Future<void> _initializePage() async {
+    _fontScale = await _settingsService.loadFontScale();
+    _colorScheme = await _settingsService.loadColorScheme();
+    if (mounted) setState(() {});
+  }
+
+  /// Envia uma mensagem e obtém uma resposta real da IA.
+  Future<void> _sendMessage(String text) async {
+    if (text.trim().isEmpty || _isLoading) return;
+
     setState(() {
-      _fontScale = prefs.getDouble(_fontScaleKey) ?? 1.0;
-      _colorScheme = prefs.getString(_colorSchemeKey) ?? 'Padrão';
+      _messages.add({'sender': 'Você', 'text': text});
+      _isLoading = true;
     });
+    _textController.clear();
+    _scrollToBottom();
+
+    // Adiciona um feedback de "digitando..."
+    setState(() => _messages.add({'sender': 'Equipe de Apoio', 'text': '...'}));
+    _scrollToBottom();
+
+    // Chama o GeminiService para uma resposta real
+    final geminiResponse = await _geminiService.sendMessage(text);
+
+    setState(() {
+      _messages.removeLast(); // Remove o "..."
+      _messages.add({'sender': 'Equipe de Apoio', 'text': geminiResponse});
+      _isLoading = false;
+    });
+    _scrollToBottom();
   }
 
-  // Envia uma nova mensagem de texto para o chat
-  void _sendMessage(String text) {
-    if (text.isNotEmpty) {
-      setState(() {
-        _messages.add({'sender': 'Você', 'text': text});
-      });
-      _textController.clear();
-      // Rola para a última mensagem adicionada
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-      // Simula a resposta da equipe após 2 segundos
-      Future.delayed(const Duration(seconds: 2), () {
-        setState(() {
-          _messages.add({'sender': 'Equipe de Apoio', 'text': 'Resposta simulada'});
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        });
-      });
-    }
-  }
-
-  // Retorna a cor primária baseada no esquema de cores selecionado
-  Color _getPrimaryColor() {
-    switch (_colorScheme) {
-      case 'Alto Contraste':
-        return Colors.black;
-      case 'Protanopia':
-        return const Color.fromRGBO(85, 148, 179, 1);
-      case 'Deuteranopia':
-        return const Color.fromRGBO(179, 148, 85, 1);
-      case 'Tritanopia':
-        return const Color.fromRGBO(148, 85, 179, 1);
-      case 'Modo Escuro':
-        return Colors.blueGrey[800]!;
-      default:
-        return const Color.fromRGBO(0, 69, 118, 1);
-    }
-  }
-
-  // Retorna a cor de fundo do Scaffold baseada no esquema de cores
-  Color _getScaffoldBackgroundColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.grey[900]! : Colors.white;
-  }
-
-  // Retorna a cor do texto baseada no esquema de cores
-  Color _getTextColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black;
-  }
-
-  // Retorna a cor do balão de mensagem para o usuário atual
-  Color _getMessageBubbleColor(bool isMe) {
-    if (isMe) {
-      return _getPrimaryColor();
-    }
-    return _colorScheme == 'Modo Escuro' ? Colors.grey[700]! : Colors.grey[300]!;
-  }
-
-  // Retorna a cor do texto da mensagem
-  Color _getMessageTextColor(bool isMe) {
-    if (isMe) {
-      return Colors.white;
-    }
-    return _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black;
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _getScaffoldBackgroundColor(),
+      backgroundColor: AppTheme.getScaffoldBackgroundColor(_colorScheme),
       appBar: AppBar(
         title: Text(
           'Chat da Equipe',
@@ -132,12 +99,10 @@ class _DeafChatPageState extends State<DeafChatPage> {
             ),
           ),
         ),
-        backgroundColor: _getPrimaryColor(),
+        backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
+          onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: SafeArea(
@@ -156,14 +121,14 @@ class _DeafChatPageState extends State<DeafChatPage> {
                       margin: const EdgeInsets.symmetric(vertical: 5.0, horizontal: 10.0),
                       padding: const EdgeInsets.all(12.0),
                       decoration: BoxDecoration(
-                        color: _getMessageBubbleColor(isMe),
+                        color: AppTheme.getMessageBubbleColor(_colorScheme, isMe),
                         borderRadius: BorderRadius.circular(15.0),
                       ),
                       child: Text(
                         message['text']!,
                         style: GoogleFonts.poppins(
                           textStyle: TextStyle(
-                            color: _getMessageTextColor(isMe),
+                            color: AppTheme.getMessageTextColor(_colorScheme, isMe),
                             fontSize: 16 * _fontScale,
                           ),
                         ),
@@ -186,15 +151,19 @@ class _DeafChatPageState extends State<DeafChatPage> {
                           borderRadius: BorderRadius.circular(20.0),
                         ),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        hintStyle: TextStyle(color: _getTextColor().withOpacity(0.5)),
+                        hintStyle: TextStyle(
+                            color: AppTheme.getMessageTextColor(_colorScheme, false).withOpacity(0.6)),
                       ),
-                      style: TextStyle(color: _getTextColor()),
-                      onSubmitted: _sendMessage,
+                      style: TextStyle(
+                          color: AppTheme.getMessageTextColor(_colorScheme, false)),
+                      onSubmitted: _isLoading ? null : _sendMessage,
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.send, color: _getPrimaryColor()),
-                    onPressed: () => _sendMessage(_textController.text),
+                    icon: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : Icon(Icons.send, color: AppTheme.getPrimaryColor(_colorScheme)),
+                    onPressed: _isLoading ? null : () => _sendMessage(_textController.text),
                   ),
                 ],
               ),

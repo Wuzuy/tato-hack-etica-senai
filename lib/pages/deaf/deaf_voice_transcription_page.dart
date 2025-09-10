@@ -1,150 +1,95 @@
 import 'package:flutter/material.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tato/services/accessibility_service.dart';
+import 'package:tato/services/settings_service.dart';
+import 'package:tato/utils/app_theme.dart';
 
-const String _fontScaleKey = 'fontScale';
-const String _colorSchemeKey = 'colorScheme';
-
+/// Uma página dedicada a transcrever a fala do ambiente para texto.
 class VoiceTranscriptionDeafPage extends StatefulWidget {
   const VoiceTranscriptionDeafPage({super.key});
 
   @override
-  State<VoiceTranscriptionDeafPage> createState() => _VoiceTranscriptionDeafPageState();
+  State<VoiceTranscriptionDeafPage> createState() =>
+      _VoiceTranscriptionDeafPageState();
 }
 
-class _VoiceTranscriptionDeafPageState extends State<VoiceTranscriptionDeafPage> {
-  final stt.SpeechToText _speechToText = stt.SpeechToText();
-  bool _isListening = false;
-  String _transcribedText = 'O que será transcrito aparecerá aqui.';
+class _VoiceTranscriptionDeafPageState
+    extends State<VoiceTranscriptionDeafPage> {
+  // --- Serviços ---
+  final SettingsService _settingsService = SettingsService();
+  final AccessibilityService _accessibilityService = AccessibilityService();
 
+  // --- Estado da UI ---
+  bool _isListening = false;
+  String _transcribedText = 'O que for dito aparecerá aqui.';
   double _fontScale = 1.0;
   String _colorScheme = 'Padrão';
 
   @override
   void initState() {
     super.initState();
-    _loadSettings();
-    _initSpeechToText();
+    _initializePage();
   }
 
   @override
   void dispose() {
-    _speechToText.stop();
+    _accessibilityService.stopListening();
     super.dispose();
   }
 
-  // Carrega as configurações de fonte e cores salvas no SharedPreferences
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _fontScale = prefs.getDouble(_fontScaleKey) ?? 1.0;
-      _colorScheme = prefs.getString(_colorSchemeKey) ?? 'Padrão';
-    });
+  /// Carrega as configurações e inicializa o serviço de acessibilidade.
+  Future<void> _initializePage() async {
+    _fontScale = await _settingsService.loadFontScale();
+    _colorScheme = await _settingsService.loadColorScheme();
+    await _accessibilityService.initialize(
+      onListeningStateChanged: (isListening) {
+        if (mounted) setState(() => _isListening = isListening);
+      },
+    );
+    if (mounted) setState(() {});
   }
 
-  // Inicializa o serviço de reconhecimento de voz
-  Future<void> _initSpeechToText() async {
-    bool available = await _speechToText.initialize();
-    if (!available) {
-      if (mounted) {
-        setState(() {
-          _transcribedText = "O serviço de reconhecimento de voz não está disponível.";
-        });
-      }
-    }
-  }
-
-  // Alterna o estado de escuta do microfone
+  /// Alterna o estado de escuta do microfone usando o serviço.
   void _toggleListening() {
     if (_isListening) {
-      _speechToText.stop();
-      setState(() {
-        _isListening = false;
-      });
+      _accessibilityService.stopListening();
     } else {
-      if (_speechToText.isAvailable) {
-        _transcribedText = ''; // Limpa o texto anterior ao iniciar
-        _speechToText.listen(
-          onResult: (result) {
-            if (mounted) {
-              setState(() {
-                _transcribedText = result.recognizedWords;
-              });
-            }
-          },
-          listenFor: const Duration(minutes: 1),
-          localeId: 'pt_BR',
-        );
-        setState(() {
-          _isListening = true;
-        });
-      } else {
-        if (mounted) {
-          setState(() {
-            _transcribedText = "O serviço de reconhecimento de voz não está disponível.";
-          });
-        }
-      }
+      setState(() => _transcribedText = ''); // Limpa o texto anterior
+      _accessibilityService.startListening(
+        onResult: (recognizedWords) {
+          if (mounted) {
+            setState(() => _transcribedText = recognizedWords);
+          }
+        },
+      );
     }
-  }
-
-  // Retorna a cor primária baseada no esquema de cores selecionado
-  Color _getPrimaryColor() {
-    switch (_colorScheme) {
-      case 'Alto Contraste':
-        return Colors.black;
-      case 'Protanopia':
-        return const Color.fromRGBO(85, 148, 179, 1);
-      case 'Deuteranopia':
-        return const Color.fromRGBO(179, 148, 85, 1);
-      case 'Tritanopia':
-        return const Color.fromRGBO(148, 85, 179, 1);
-      case 'Modo Escuro':
-        return Colors.blueGrey[800]!;
-      default:
-        return const Color.fromRGBO(0, 69, 118, 1);
-    }
-  }
-
-  // Retorna a cor de fundo do Scaffold baseada no esquema de cores
-  Color _getScaffoldBackgroundColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.grey[900]! : Colors.white;
-  }
-
-  // Retorna a cor do texto baseada no esquema de cores
-  Color _getTextColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _getScaffoldBackgroundColor(),
+      backgroundColor: AppTheme.getScaffoldBackgroundColor(_colorScheme),
       appBar: AppBar(
-        backgroundColor: _getPrimaryColor(),
+        backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
+          onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: SafeArea( // Adicionado o widget SafeArea para respeitar as áreas seguras
+      body: SafeArea(
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                // Botão do microfone
                 InkWell(
                   onTap: _toggleListening,
                   borderRadius: BorderRadius.circular(100),
                   child: CircleAvatar(
                     radius: 80 * _fontScale,
-                    backgroundColor: _getPrimaryColor(),
+                    backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
                     child: Icon(
                       _isListening ? Icons.mic : Icons.mic_none,
                       color: Colors.white,
@@ -153,18 +98,16 @@ class _VoiceTranscriptionDeafPageState extends State<VoiceTranscriptionDeafPage>
                   ),
                 ),
                 const SizedBox(height: 20),
-                // Texto de instrução
                 Text(
-                  _isListening ? 'Ouvindo...' : 'Aperte o botão para captar voz',
+                  _isListening ? 'Ouvindo...' : 'Toque no botão para captar voz',
                   style: GoogleFonts.poppins(
                     textStyle: TextStyle(
-                      color: _getTextColor(),
+                      color: AppTheme.getMessageTextColor(_colorScheme, false),
                       fontSize: 18 * _fontScale,
                     ),
                   ),
                 ),
                 const SizedBox(height: 40),
-                // Área de transcrição
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Column(
@@ -174,7 +117,7 @@ class _VoiceTranscriptionDeafPageState extends State<VoiceTranscriptionDeafPage>
                         'Transcrição:',
                         style: GoogleFonts.poppins(
                           textStyle: TextStyle(
-                            color: _getTextColor(),
+                            color: AppTheme.getMessageTextColor(_colorScheme, false),
                             fontSize: 16 * _fontScale,
                             fontWeight: FontWeight.bold,
                           ),
@@ -184,17 +127,20 @@ class _VoiceTranscriptionDeafPageState extends State<VoiceTranscriptionDeafPage>
                       Container(
                         padding: const EdgeInsets.all(16.0),
                         width: double.infinity,
+                        height: 150, // Altura fixa para a caixa de texto
                         decoration: BoxDecoration(
-                          color: _colorScheme == 'Modo Escuro' ? Colors.grey[700] : Colors.white,
+                          color: _colorScheme == 'Modo Escuro' ? Colors.grey[800] : Colors.white,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: _getPrimaryColor(), width: 2),
+                          border: Border.all(color: AppTheme.getPrimaryColor(_colorScheme), width: 2),
                         ),
-                        child: Text(
-                          _transcribedText,
-                          style: GoogleFonts.poppins(
-                            textStyle: TextStyle(
-                              fontSize: 16 * _fontScale,
-                              color: _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black,
+                        child: SingleChildScrollView( // Permite rolagem se o texto for grande
+                          child: Text(
+                            _transcribedText,
+                            style: GoogleFonts.poppins(
+                              textStyle: TextStyle(
+                                fontSize: 16 * _fontScale,
+                                color: AppTheme.getMessageTextColor(_colorScheme, false),
+                              ),
                             ),
                           ),
                         ),

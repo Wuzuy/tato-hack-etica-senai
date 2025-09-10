@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_tts/flutter_tts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tato/services/accessibility_service.dart';
+import 'package:tato/services/settings_service.dart';
+import 'package:tato/utils/app_theme.dart';
 
-const String _fontScaleKey = 'fontScale';
-const String _colorSchemeKey = 'colorScheme';
-
+/// Uma página que exibe e lê em voz alta o guia de uso do aplicativo.
 class UsageGuidePage extends StatefulWidget {
   const UsageGuidePage({super.key});
 
@@ -13,19 +12,23 @@ class UsageGuidePage extends StatefulWidget {
 }
 
 class _UsageGuidePageState extends State<UsageGuidePage> {
-  final FlutterTts _flutterTts = FlutterTts();
+  // --- Serviços ---
+  final SettingsService _settingsService = SettingsService();
+  final AccessibilityService _accessibilityService = AccessibilityService();
+
+  // --- Conteúdo e Estado da UI ---
   final String _usageGuide = '''
 GUIA DO USUÁRIO
 
-Diga: 'olá Tati' para ativar nossa inteligência artificial.
+Para interagir com o assistente, toque e segure o botão do microfone e fale um comando.
 
-Para traçar uma rota, diga "Tati, traçar rota para o local".
+Para traçar uma rota no mapa, diga "me leve para" seguido do seu destino.
 
-Para enviar um alerta de emergência, diga "Tati socorro" ou "socorro".
+Para enviar um alerta de emergência, diga "socorro" ou utilize o botão de SOS.
 
-Diga: 'Tati, abrir chat' para conversar com os membros da equipe.
+Para conversar livremente com a inteligência artificial, use a página de Chat.
 
-Diga: 'Tati, configurações' para acessar a aba de ajustes do app.
+Para ajustar as cores e o tamanho da fonte, diga "abrir configurações".
 ''';
 
   double _fontScale = 1.0;
@@ -34,77 +37,56 @@ Diga: 'Tati, configurações' para acessar a aba de ajustes do app.
   @override
   void initState() {
     super.initState();
-    _loadSettings();
-    _initTts();
-    _speakUsageGuide();
+    _initializePage();
+  }
+
+  /// Carrega configurações e inicializa os serviços.
+  Future<void> _initializePage() async {
+    _fontScale = await _settingsService.loadFontScale();
+    _colorScheme = await _settingsService.loadColorScheme();
+
+    // CORREÇÃO: Passamos a função exigida pelo method 'initialize'.
+    await _accessibilityService.initialize(
+      onListeningStateChanged: (isListening) {
+        // Esta página não tem feedback de escuta, então a função pode ser vazia.
+        // Apenas cumprimos o contrato do method.
+      },
+    );
+
+    await _accessibilityService.speak(_usageGuide);
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
-    _flutterTts.stop();
+    _accessibilityService.stopSpeaking();
     super.dispose();
-  }
-
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        _fontScale = prefs.getDouble(_fontScaleKey) ?? 1.0;
-        _colorScheme = prefs.getString(_colorSchemeKey) ?? 'Padrão';
-      });
-    }
-  }
-
-  Future<void> _initTts() async {
-    await _flutterTts.setLanguage("pt-BR");
-    await _flutterTts.setSpeechRate(0.5);
-  }
-
-  Future<void> _speakUsageGuide() async {
-    await _flutterTts.speak(_usageGuide);
-  }
-
-  Color _getPrimaryColor() {
-    switch (_colorScheme) {
-      case 'Alto Contraste':
-        return Colors.black;
-      case 'Modo Daltonismo':
-        return const Color.fromRGBO(0, 150, 136, 1);
-      case 'Modo Escuro':
-        return Colors.blueGrey[800]!;
-      default:
-        return const Color.fromRGBO(0, 69, 118, 1);
-    }
-  }
-
-  Color _getScaffoldBackgroundColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.grey[900]! : Colors.white;
-  }
-
-  Color _getAppBarContentColor() {
-    return _colorScheme == 'Alto Contraste' || _colorScheme == 'Modo Escuro' ? Colors.white : Colors.white;
-  }
-
-  Color _getTextColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _getScaffoldBackgroundColor(),
+      backgroundColor: AppTheme.getScaffoldBackgroundColor(_colorScheme),
       appBar: AppBar(
-        title: Text('Guia de Uso', style: TextStyle(color: _getAppBarContentColor(), fontSize: 20 * _fontScale)),
-        backgroundColor: _getPrimaryColor(),
+        title: Text(
+          'Guia de Uso',
+          style: TextStyle(color: Colors.white, fontSize: 20 * _fontScale),
+        ),
+        backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: _getAppBarContentColor(), size: 24 * _fontScale),
+          icon: Icon(
+            Icons.arrow_back,
+            color: Colors.white,
+            size: 24 * _fontScale,
+          ),
           onPressed: () {
-            _flutterTts.stop();
+            // Garante que a fala pare ao voltar
+            _accessibilityService.stopSpeaking();
             Navigator.of(context).pop();
           },
         ),
       ),
-      body: SafeArea( // Adicionado o widget SafeArea
+      body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Text(
@@ -112,7 +94,7 @@ Diga: 'Tati, configurações' para acessar a aba de ajustes do app.
             style: TextStyle(
               fontSize: 16 * _fontScale,
               height: 1.5,
-              color: _getTextColor(),
+              color: AppTheme.getMessageTextColor(_colorScheme, false),
             ),
           ),
         ),

@@ -1,9 +1,10 @@
-import"dart:convert";
-import"package:http/http.dart" as http;
-import "package:tato/database/models/user_model.dart";
+import "dart:convert";
+import "package:http/http.dart" as http;
+import "package:tato/models/user_model.dart";
 
 class UserService {
-  final String _baseUrl = 'https://xyladptiqj.execute-api.sa-east-1.amazonaws.com';
+  final String _baseUrl =
+      'https://xyladptiqj.execute-api.sa-east-1.amazonaws.com';
 
   String? _authToken;
 
@@ -48,6 +49,4 @@ class UserService {
       throw Exception('Falha ao atualizar dados do usuário: ${response.body}');
     }
   }
-
-
 }

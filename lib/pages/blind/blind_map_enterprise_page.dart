@@ -1,18 +1,16 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_tts/flutter_tts.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tato/models/command_result.dart';
+import 'package:tato/services/accessibility_service.dart';
+import 'package:tato/services/command_interpreter_service.dart';
+import 'package:tato/services/gemini_service.dart';
+import 'package:tato/services/global_command_service.dart';
+import 'package:tato/services/settings_service.dart';
+import 'package:tato/utils/app_theme.dart';
 
-import 'blind_usage_guide_page.dart';
-import 'blind_chat_page.dart';
-import 'blind_settings_page.dart';
+// Importações das páginas de destino
 import 'sos_page.dart';
 
-const String _fontScaleKey = 'fontScale';
-const String _colorSchemeKey = 'colorScheme';
-
+/// Uma página de mapa demonstrativa (Empresarial) controlada por voz.
 class BlindMapEnterprisePage extends StatefulWidget {
   const BlindMapEnterprisePage({super.key});
 
@@ -21,205 +19,124 @@ class BlindMapEnterprisePage extends StatefulWidget {
 }
 
 class _BlindMapEnterprisePageState extends State<BlindMapEnterprisePage> {
-  final FlutterTts _flutterTts = FlutterTts();
-  late stt.SpeechToText _speech;
+  // --- Serviços ---
+  final SettingsService _settingsService = SettingsService();
+  final AccessibilityService _accessibilityService = AccessibilityService();
+  final GeminiService _geminiService = GeminiService();
+  late final CommandInterpreterService _commandInterpreterService;
+  late final GlobalCommandService _globalCommandService;
+
+  // --- Estado da UI ---
   bool _isListening = false;
   String _lastWords = '';
-
   double _fontScale = 1.0;
   String _colorScheme = 'Padrão';
 
   @override
   void initState() {
     super.initState();
-    _loadSettings();
-    _initTts();
-    _speakInitialInstructions();
-    _speech = stt.SpeechToText();
-    _initializeSpeech();
+    _commandInterpreterService = CommandInterpreterService(_geminiService);
+    _globalCommandService = GlobalCommandService(_commandInterpreterService, _accessibilityService);
+    _initializePage();
+  }
+
+  /// Carrega configurações e inicializa os serviços.
+  Future<void> _initializePage() async {
+    _fontScale = await _settingsService.loadFontScale();
+    _colorScheme = await _settingsService.loadColorScheme();
+
+    // CORRIGIDO: Passa o callback necessário para o method initialize.
+    await _accessibilityService.initialize(
+      onListeningStateChanged: (isListening) {
+        if (mounted) setState(() => _isListening = isListening);
+      },
+    );
+
+    await _accessibilityService.speak(
+      "Você está na página de mapa demonstrativo. Toque no botão de microfone para interagir.",
+    );
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
-    _flutterTts.stop();
-    _speech.stop();
+    _accessibilityService.stopSpeaking();
+    _accessibilityService.stopListening();
     super.dispose();
   }
 
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        _fontScale = prefs.getDouble(_fontScaleKey) ?? 1.0;
-        _colorScheme = prefs.getString(_colorSchemeKey) ?? 'Padrão';
-      });
-    }
-  }
-
-  Future<void> _initTts() async {
-    await _flutterTts.setLanguage("pt-BR");
-    await _flutterTts.setSpeechRate(0.5);
-  }
-
-  Future<void> _speakInitialInstructions() async {
-    await _flutterTts.speak(
-        "Você está na página de mapa demonstrativo. Toque no botão de microfone para interagir.");
-  }
-
-  Future<void> _initializeSpeech() async {
-    bool available = await _speech.initialize(
-      onStatus: (status) {
-        debugPrint('Speech status: $status');
-        if (status == stt.SpeechToText.listeningStatus) {
-          setState(() => _isListening = true);
-        } else {
-          setState(() => _isListening = false);
-        }
-      },
-      onError: (error) => debugPrint('Speech error: $error'),
-    );
-    if (!available) {
-      _flutterTts.speak("O reconhecimento de voz não está disponível neste dispositivo.");
-    }
-  }
-
-  void _startListening() async {
-    await _speech.listen(
-      localeId: 'pt_BR',
-      onResult: (result) {
-        if (mounted) {
-          setState(() {
-            _lastWords = result.recognizedWords;
-          });
-        }
-        if (result.finalResult && _lastWords.isNotEmpty) {
-          _processVoiceCommand(_lastWords);
-          _stopListening();
-        }
+  /// Inicia a escuta de voz.
+  void _startListening() {
+    setState(() => _lastWords = '');
+    // CORRIGIDO: A chamada agora é mais simples.
+    _accessibilityService.startListening(
+      onResult: (recognizedWords) {
+        setState(() => _lastWords = recognizedWords);
+        _handleVoiceCommand(recognizedWords);
       },
     );
   }
 
-  Future<void> _stopListening() async {
-    await _speech.stop();
+  /// Para a escuta de voz.
+  void _stopListening() {
+    // CORRIGIDO: A chamada agora é mais simples.
+    _accessibilityService.stopListening();
   }
 
-  void _processVoiceCommand(String command) {
-    String normalizedCommand = command.toLowerCase().trim();
+  /// Processa o texto falado, delegando para o serviço global primeiro.
+  Future<void> _handleVoiceCommand(String text) async {
+    final CommandResult result = await _commandInterpreterService.interpretCommand(text);
+    final bool wasHandledGlobally = await _globalCommandService.executeCommand(text, result);
 
-    if (normalizedCommand.contains('tati socorro') || normalizedCommand.contains('socorro')) {
-      _flutterTts.stop();
-      _speech.stop();
-      _flutterTts.speak('Comando de socorro recebido. Enviando sua localização para a equipe de emergência.');
-      Future.delayed(const Duration(seconds: 3), () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => const SosPage(),
-          ),
-        );
-      });
-      return;
-    }
-
-    if (normalizedCommand.contains('me leve a') || normalizedCommand.contains('me leve ao')) {
-      _flutterTts.speak("Esta é uma página de demonstração, não é possível traçar rotas.");
-    } else if (normalizedCommand.contains('guia')) {
-      _navigateToUsageGuidePage();
-    } else if (normalizedCommand.contains('chat')) {
-      _navigateToChatPage();
-    } else if (normalizedCommand.contains('configurações') || normalizedCommand.contains('ajustes')) {
-      _navigateToSettingsPage();
-    } else {
-      _flutterTts.speak("Comando não reconhecido. Por favor, tente novamente.");
+    if (!wasHandledGlobally) {
+      // Trata comandos que NÃO são globais e são específicos desta página
+      switch (result.intent) {
+        case 'navigate_to_address':
+          await _accessibilityService.speak(
+            "Esta é uma página de demonstração, não é possível traçar rotas.",
+          );
+          break;
+        default:
+          await _accessibilityService.speak(
+            "Comando não reconhecido. Diga 'guia de uso' para ver os comandos.",
+          );
+          break;
+      }
     }
   }
 
-  void _navigateToUsageGuidePage() {
-    _flutterTts.stop();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const UsageGuidePage()),
-    ).then((_) => _loadSettings());
-  }
-
-  void _navigateToChatPage() {
-    _flutterTts.stop();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const ChatPage()),
-    ).then((_) => _loadSettings());
-  }
-
-  void _navigateToSettingsPage() {
-    _flutterTts.stop();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const SettingsPage()),
-    ).then((_) => _loadSettings());
-  }
-
-  Color _getPrimaryColor() {
-    switch (_colorScheme) {
-      case 'Alto Contraste':
-        return Colors.black;
-      case 'Protanopia':
-        return const Color.fromRGBO(85, 148, 179, 1);
-      case 'Deuteranopia':
-        return const Color.fromRGBO(179, 148, 85, 1);
-      case 'Tritanopia':
-        return const Color.fromRGBO(148, 85, 179, 1);
-      case 'Modo Escuro':
-        return Colors.blueGrey[800]!;
-      default:
-        return const Color.fromRGBO(0, 69, 118, 1);
-    }
-  }
-
-  Color _getScaffoldBackgroundColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.grey[900]! : Colors.white;
-  }
-
-  Color _getAppBarIconColor() {
-    return _colorScheme == 'Alto Contraste' || _colorScheme == 'Modo Escuro' ? Colors.white : Colors.white;
-  }
-
-  Color _getCardColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.grey[850]! : Colors.white;
-  }
-
-  Color _getTextColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black;
-  }
-
-  Color _getMicIconColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.white : const Color.fromRGBO(0, 69, 118, 1);
+  void _navigateToSosPage() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (context) => const SosPage()));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _getScaffoldBackgroundColor(),
+      backgroundColor: AppTheme.getScaffoldBackgroundColor(_colorScheme),
       appBar: AppBar(
-        backgroundColor: _getPrimaryColor(),
+        backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: _getAppBarIconColor(), size: 24 * _fontScale),
+          icon: Icon(Icons.arrow_back, color: Colors.white, size: 24 * _fontScale),
           onPressed: () {
-            _flutterTts.stop();
+            _accessibilityService.stopSpeaking();
             Navigator.of(context).pop();
           },
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.help_outline, color: _getAppBarIconColor(), size: 24 * _fontScale),
-            onPressed: _navigateToUsageGuidePage,
+            icon: Icon(Icons.help_outline, color: Colors.white, size: 24 * _fontScale),
+            onPressed: () => _globalCommandService.executeCommand("guia de uso", CommandResult(intent: 'read_usage_guide', parameters: {})),
             tooltip: 'Guia de Uso',
           ),
           IconButton(
-            icon: Icon(Icons.chat, color: _getAppBarIconColor(), size: 24 * _fontScale),
-            onPressed: _navigateToChatPage,
+            icon: Icon(Icons.chat, color: Colors.white, size: 24 * _fontScale),
+            onPressed: () => _globalCommandService.executeCommand("abrir chat", CommandResult(intent: 'open_chat', parameters: {})),
             tooltip: 'Chat',
           ),
           IconButton(
-            icon: Icon(Icons.settings, color: _getAppBarIconColor(), size: 24 * _fontScale),
-            onPressed: _navigateToSettingsPage,
+            icon: Icon(Icons.settings, color: Colors.white, size: 24 * _fontScale),
+            onPressed: () => _globalCommandService.executeCommand("abrir configurações", CommandResult(intent: 'open_settings', parameters: {})),
             tooltip: 'Configurações',
           ),
         ],
@@ -227,74 +144,47 @@ class _BlindMapEnterprisePageState extends State<BlindMapEnterprisePage> {
       body: SafeArea(
         child: Stack(
           children: <Widget>[
-            // Imagem estática do mapa
             Positioned.fill(
               child: Image.asset(
                 'images/mapa.png',
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey,
-                    child: Center(
-                      child: Text(
-                        'Erro ao carregar a imagem do mapa',
-                        style: TextStyle(color: _getTextColor()),
-                      ),
-                    ),
-                  );
-                },
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.grey,
+                  child: Center(
+                    child: Text('Erro ao carregar o mapa',
+                        style: TextStyle(color: AppTheme.getMessageTextColor(_colorScheme, false))),
+                  ),
+                ),
               ),
             ),
-            // Stack de botões na parte inferior da tela
             Positioned(
               bottom: 20,
               left: 20,
               right: 20,
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // Botão de SOS
                   SizedBox(
-                    width: 64.0, // Define a largura do botão quadrado
-                    height: 64.0, // Define a altura do botão quadrado
+                    width: 64.0,
+                    height: 64.0,
                     child: Card(
                       color: Colors.red[800],
                       elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       child: InkWell(
-                        onTap: () {
-                          _flutterTts.stop();
-                          _speech.stop();
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const SosPage(),
-                            ),
-                          );
-                        },
+                        onTap: _navigateToSosPage,
                         borderRadius: BorderRadius.circular(15),
                         child: Icon(Icons.warning, color: Colors.white, size: 40 * _fontScale),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Botão de microfone
                   Card(
-                    color: _getCardColor(),
+                    color: AppTheme.getScaffoldBackgroundColor(_colorScheme),
                     elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                     child: InkWell(
-                      onTap: () {
-                        if (_isListening) {
-                          _stopListening();
-                        } else {
-                          _startListening();
-                        }
-                      },
+                      onTap: _isListening ? _stopListening : _startListening,
                       borderRadius: BorderRadius.circular(15),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -303,9 +193,7 @@ class _BlindMapEnterprisePageState extends State<BlindMapEnterprisePage> {
                           children: [
                             Icon(
                               _isListening ? Icons.mic_off : Icons.mic,
-                              color: _isListening
-                                  ? Colors.red
-                                  : _getMicIconColor(),
+                              color: _isListening ? Colors.red : AppTheme.getPrimaryColor(_colorScheme),
                               size: 36 * _fontScale,
                             ),
                             const SizedBox(width: 16),
@@ -314,7 +202,9 @@ class _BlindMapEnterprisePageState extends State<BlindMapEnterprisePage> {
                                 _isListening
                                     ? "Ouvindo..."
                                     : (_lastWords.isEmpty ? "Toque para falar" : _lastWords),
-                                style: TextStyle(fontSize: 18 * _fontScale, color: _getTextColor()),
+                                style: TextStyle(
+                                    fontSize: 18 * _fontScale,
+                                    color: AppTheme.getMessageTextColor(_colorScheme, false)),
                                 textAlign: TextAlign.center,
                               ),
                             ),

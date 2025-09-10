@@ -1,24 +1,23 @@
-import 'dart:async';
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:geocoding/geocoding.dart' as geocoding;
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:tato/models/command_result.dart';
+import 'package:tato/settings_page.dart';
+import 'package:tato/services/accessibility_service.dart';
+import 'package:tato/services/command_interpreter_service.dart';
+import 'package:tato/services/gemini_service.dart';
+import 'package:tato/services/global_command_service.dart';
+import 'package:tato/services/map_service.dart';
+import 'package:tato/services/settings_service.dart';
+import 'package:tato/utils/app_theme.dart';
 
-import 'blind_usage_guide_page.dart';
 import 'blind_chat_page.dart';
-import 'blind_settings_page.dart';
 import 'blind_map_enterprise_page.dart';
+import 'blind_usage_guide_page.dart';
 
-const String _fontScaleKey = 'fontScale';
-const String _colorSchemeKey = 'colorScheme';
-
+/// Página principal do mapa com navegação por voz inteligente.
 class BlindMapPage extends StatefulWidget {
   const BlindMapPage({super.key});
 
@@ -27,301 +26,171 @@ class BlindMapPage extends StatefulWidget {
 }
 
 class _BlindMapPageState extends State<BlindMapPage> {
-  final FlutterTts _flutterTts = FlutterTts();
+  // --- Serviços ---
+  final SettingsService _settingsService = SettingsService();
+  final AccessibilityService _accessibilityService = AccessibilityService();
+  final GeminiService _geminiService = GeminiService();
+  final MapService _mapService = MapService();
+  late final CommandInterpreterService _commandInterpreterService;
+  late final GlobalCommandService _globalCommandService;
+
+  // --- Estado da UI e Controladores ---
   final MapController _mapController = MapController();
-  final TextEditingController _addressController = TextEditingController();
   List<LatLng> _routePoints = [];
-
-  late stt.SpeechToText _speech;
+  LatLng _center = LatLng(0, 0); // Posição inicial neutra
   bool _isListening = false;
-  String _lastWords = '';
-
-  LatLng _center = LatLng(-22.7884, -43.3101);
-
   double _fontScale = 1.0;
   String _colorScheme = 'Padrão';
-
-  final String _openRouteServiceApiKey = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRkOGQ4YTEwOWE5ZTRmNjhiM2RiNDY4ODc3NTczZDZlIiwiaCI6Im11cm11cjY0In0=';
+  String _lastWords = '';
+  final String _orsApiKey = dotenv.env['OPEN_ROUTE_SERVICE_API_KEY'] ?? '';
 
   @override
   void initState() {
     super.initState();
-    _loadSettings();
-    _initTts();
-    _speakInitialInstructions();
-    _speech = stt.SpeechToText();
-    _initializeSpeech();
-    _getCurrentLocation();
+    _commandInterpreterService = CommandInterpreterService(_geminiService);
+    // CORRIGIDO: Instancia e atribui o serviço global corretamente.
+    _globalCommandService = GlobalCommandService(_commandInterpreterService, _accessibilityService);
+    _initializePage();
   }
 
   @override
   void dispose() {
-    _flutterTts.stop();
-    _addressController.dispose();
+    _accessibilityService.stopSpeaking();
+    _accessibilityService.stopListening();
     super.dispose();
   }
 
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        _fontScale = prefs.getDouble(_fontScaleKey) ?? 1.0;
-        _colorScheme = prefs.getString(_colorSchemeKey) ?? 'Padrão';
-      });
-    }
-  }
+  /// Carrega configs, inicializa serviços e busca a localização inicial.
+  Future<void> _initializePage() async {
+    _fontScale = await _settingsService.loadFontScale();
+    _colorScheme = await _settingsService.loadColorScheme();
 
-  Future<void> _initTts() async {
-    await _flutterTts.setLanguage("pt-BR");
-    await _flutterTts.setSpeechRate(0.5);
-  }
-
-  Future<void> _speakInitialInstructions() async {
-    await _flutterTts.speak(
-        "Bem-vindo ao Tato. Toque no botão de microfone e diga o nome da sua empresa.");
-  }
-
-  Future<void> _initializeSpeech() async {
-    bool available = await _speech.initialize(
-      onStatus: (status) {
-        debugPrint('Speech status: $status');
-        if (status == stt.SpeechToText.listeningStatus) {
-          setState(() => _isListening = true);
-        } else {
-          setState(() => _isListening = false);
-        }
+    // CORRIGIDO: Passa o callback para o initialize.
+    await _accessibilityService.initialize(
+      onListeningStateChanged: (isListening) {
+        if (mounted) setState(() => _isListening = isListening);
       },
-      onError: (error) => debugPrint('Speech error: $error'),
     );
-    if (!available) {
-      _flutterTts.speak("O reconhecimento de voz não está disponível neste dispositivo.");
-    }
+
+    await _accessibilityService.speak(
+      "Bem-vindo ao mapa. Toque no botão de microfone e diga para onde quer ir.",
+    );
+    await _centerOnCurrentLocation();
+    if (mounted) setState(() {});
   }
 
-  Future<void> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      _flutterTts.speak("Serviço de localização está desativado.");
-      return;
-    }
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        _flutterTts.speak("Permissão de localização negada.");
-        return;
+  /// Inicia a escuta de voz.
+  void _startListening() {
+    setState(() => _lastWords = '');
+    // CORRIGIDO: Chamada simplificada.
+    _accessibilityService.startListening(
+      onResult: (recognizedWords) {
+        setState(() => _lastWords = recognizedWords);
+        _handleVoiceCommand(recognizedWords);
+      },
+    );
+  }
+
+  /// Para a escuta de voz.
+  void _stopListening() {
+    // CORRIGIDO: Chamada simplificada.
+    _accessibilityService.stopListening();
+  }
+
+  /// Interpreta o comando de voz e executa a ação correspondente.
+  Future<void> _handleVoiceCommand(String text) async {
+    final CommandResult result = await _commandInterpreterService.interpretCommand(text);
+
+    // CORRIGIDO: Usa a instância de serviço da classe.
+    final bool wasHandledGlobally = await _globalCommandService.executeCommand(text, result);
+
+    if (!wasHandledGlobally) {
+      switch (result.intent) {
+        case 'navigate_to_address':
+          final address = result.parameters['address'] as String?;
+          if (address != null) {
+            await _plotRouteToAddress(address);
+          } else {
+            await _accessibilityService.speak("Não entendi o endereço. Tente novamente.");
+          }
+          break;
+        default:
+          await _accessibilityService.speak("Comando não reconhecido. Diga 'me leve para' e um endereço, ou 'guia de uso' para ajuda.");
+          break;
       }
     }
-    if (permission == LocationPermission.deniedForever) {
-      _flutterTts.speak("Permissão de localização negada permanentemente.");
-      return;
-    }
-    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-    if(mounted) {
-      setState(() {
-        _center = LatLng(position.latitude, position.longitude);
-        _routePoints = [_center];
-        _mapController.move(_center, 15.0);
-      });
-    }
   }
 
-  void _startListening() async {
-    await _speech.listen(
-      localeId: 'pt_BR',
-      onResult: (result) {
-        if (mounted) {
-          setState(() {
-            _lastWords = result.recognizedWords;
-          });
-        }
-        if (result.finalResult && _lastWords.isNotEmpty) {
-          _processVoiceCommand(_lastWords);
-          _stopListening();
-        }
-      },
-    );
-  }
+  /// Orquestra a busca e o traçado de uma rota para um endereço.
+  Future<void> _plotRouteToAddress(String address) async {
+    await _accessibilityService.speak("Buscando o endereço: $address");
+    LatLng? destination = await _mapService.getCoordinatesFromAddress(address, _center);
 
-  Future<void> _stopListening() async {
-    await _speech.stop();
-  }
-
-  void _processVoiceCommand(String command) {
-    String normalizedCommand = command.toLowerCase().trim();
-
-    if (normalizedCommand.contains('me leve a') || normalizedCommand.contains('me leve ao')) {
-      final address = normalizedCommand.substring(normalizedCommand.indexOf('a') + 1).trim();
-      _searchAddressAndCreateRoute(address);
-    } else if (normalizedCommand.contains('guia')) {
-      _navigateToUsageGuidePage();
-    } else if (normalizedCommand.contains('chat')) {
-      _navigateToChatPage();
-    } else if (normalizedCommand.contains('configurações') || normalizedCommand.contains('ajustes')) {
-      _navigateToSettingsPage();
-    } else if (normalizedCommand.contains('mapa empresarial')) {
-      _navigateToBlindMapEnterprisePage();
+    if (destination != null && _routePoints.isNotEmpty) {
+      final startPoint = _routePoints.first;
+      List<LatLng> points = await _mapService.getRoute(startPoint, destination, _orsApiKey);
+      setState(() => _routePoints = points);
+      _mapController.move(destination, 15.0);
+      await _accessibilityService.speak("Rota para o destino traçada no mapa.");
     } else {
-      _flutterTts.speak("Comando não reconhecido. Por favor, tente novamente.");
+      await _accessibilityService.speak("Não foi possível encontrar o endereço ou sua localização atual.");
     }
   }
 
-  Future<void> _searchAddressAndCreateRoute(String address) async {
-    _flutterTts.speak("Buscando o endereço: $address");
+  /// Busca a localização atual e centraliza o mapa nela.
+  Future<void> _centerOnCurrentLocation() async {
     try {
-      List<geocoding.Location> locations = await geocoding.locationFromAddress(address);
-      if (locations.isNotEmpty) {
-        final LatLng destination = LatLng(locations.first.latitude, locations.first.longitude);
-        await _traceRouteByRoads(_center, destination);
-        _flutterTts.speak("Rota para o destino traçada no mapa.");
-        if (mounted) setState(() {});
-        _mapController.move(destination, 15.0);
-      } else {
-        _flutterTts.speak("Não foi possível encontrar o endereço. Tente novamente.");
-      }
+      final Position position = await _mapService.getCurrentLocation();
+      final currentLocation = LatLng(position.latitude, position.longitude);
+      setState(() {
+        _center = currentLocation;
+        _routePoints = [currentLocation];
+        _mapController.move(currentLocation, 15.0);
+      });
     } catch (e) {
-      _flutterTts.speak("Houve um erro ao processar o endereço.");
+      await _accessibilityService.speak(e.toString());
     }
   }
 
-  Future<void> _traceRouteByRoads(LatLng start, LatLng end) async {
-    final url = Uri.parse('https://api.openrouteservice.org/v2/directions/foot-walking/geojson');
-    final body = jsonEncode({
-      "coordinates": [
-        [start.longitude, start.latitude],
-        [end.longitude, end.latitude]
-      ]
-    });
-    try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Authorization': _openRouteServiceApiKey,
-          'Content-Type': 'application/json',
-        },
-        body: body,
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final coords = data['features'][0]['geometry']['coordinates'] as List;
-        List<LatLng> points = coords
-            .map((c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
-            .toList();
-        if (mounted) {
-          setState(() {
-            _routePoints = points;
-          });
-        }
-      } else {
-        debugPrint('Erro ORS: ${response.statusCode} ${response.body}');
-        _flutterTts.speak("Não foi possível traçar a rota detalhada, usando linha reta.");
-        if (mounted) {
-          setState(() {
-            _routePoints = [start, end];
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Erro requisição ORS: $e');
-      _flutterTts.speak("Erro ao buscar rota detalhada, usando linha reta.");
-      if (mounted) {
-        setState(() {
-          _routePoints = [start, end];
-        });
-      }
-    }
-  }
-
-  void _navigateToUsageGuidePage() {
-    _flutterTts.stop();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const UsageGuidePage()),
-    ).then((_) => _loadSettings());
-  }
-
-  void _navigateToChatPage() {
-    _flutterTts.stop();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const ChatPage()),
-    ).then((_) => _loadSettings());
-  }
-
-  void _navigateToSettingsPage() {
-    _flutterTts.stop();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const SettingsPage()),
-    ).then((_) => _loadSettings());
-  }
-
-  void _navigateToBlindMapEnterprisePage() {
-    _flutterTts.stop();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const BlindMapEnterprisePage()),
-    ).then((_) => _loadSettings());
-  }
-
-  Color _getPrimaryColor() {
-    switch (_colorScheme) {
-      case 'Alto Contraste':
-        return Colors.black;
-      case 'Protanopia':
-        return const Color.fromRGBO(85, 148, 179, 1);
-      case 'Deuteranopia':
-        return const Color.fromRGBO(179, 148, 85, 1);
-      case 'Tritanopia':
-        return const Color.fromRGBO(148, 85, 179, 1);
-      case 'Modo Escuro':
-        return Colors.blueGrey[800]!;
-      default:
-        return const Color.fromRGBO(0, 69, 118, 1);
-    }
-  }
-
-  Color _getScaffoldBackgroundColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.grey[900]! : Colors.white;
-  }
-
-  Color _getAppBarIconColor() {
-    return _colorScheme == 'Alto Contraste' || _colorScheme == 'Modo Escuro' ? Colors.white : Colors.white;
-  }
-
-  Color _getCardColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.grey[850]! : Colors.white;
-  }
-
-  Color _getTextColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.white : Colors.black;
-  }
-
-  Color _getMicIconColor() {
-    return _colorScheme == 'Modo Escuro' ? Colors.white : const Color.fromRGBO(0, 69, 118, 1);
+  /// Helper para navegar para uma página e recarregar as configs ao voltar.
+  void _navigateToPage(Widget page) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page))
+        .then((_) => _initializePage());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _getScaffoldBackgroundColor(),
+      backgroundColor: AppTheme.getScaffoldBackgroundColor(_colorScheme),
       appBar: AppBar(
-        backgroundColor: _getPrimaryColor(),
+        backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: _getAppBarIconColor(), size: 24 * _fontScale),
+          icon: Icon(Icons.arrow_back, color: Colors.white, size: 24 * _fontScale),
           onPressed: () {
-            _flutterTts.stop();
+            _accessibilityService.stopSpeaking();
             Navigator.of(context).pop();
           },
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.settings, color: _getAppBarIconColor(), size: 24 * _fontScale),
-            onPressed: _navigateToSettingsPage,
+            icon: Icon(Icons.help_outline, color: Colors.white, size: 24 * _fontScale),
+            onPressed: () => _navigateToPage(const UsageGuidePage()),
+            tooltip: 'Guia de Uso',
+          ),
+          IconButton(
+            icon: Icon(Icons.chat, color: Colors.white, size: 24 * _fontScale),
+            onPressed: () => _navigateToPage(const BlindChatPage()),
+            tooltip: 'Chat',
+          ),
+          IconButton(
+            icon: Icon(Icons.settings, color: Colors.white, size: 24 * _fontScale),
+            onPressed: () => _navigateToPage(const SettingsPage()),
             tooltip: 'Configurações',
           ),
           IconButton(
-            icon: Icon(Icons.my_location, color: _getAppBarIconColor(), size: 24 * _fontScale),
-            onPressed: _getCurrentLocation,
+            icon: Icon(Icons.my_location, color: Colors.white, size: 24 * _fontScale),
+            onPressed: _centerOnCurrentLocation,
             tooltip: 'Centralizar',
           ),
         ],
@@ -331,29 +200,22 @@ class _BlindMapPageState extends State<BlindMapPage> {
           children: <Widget>[
             FlutterMap(
               mapController: _mapController,
-              options: MapOptions(
-                center: _center,
-                zoom: 15.0,
-              ),
+              options: MapOptions(center: _center, zoom: 15.0),
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.tato',
+                  userAgentPackageName: 'com.tato.app',
                 ),
                 PolylineLayer(
                   polylines: [
-                    Polyline(
-                      points: _routePoints,
-                      strokeWidth: 5.0,
-                      color: Colors.blue,
-                    ),
+                    Polyline(points: _routePoints, strokeWidth: 5.0, color: Colors.blue),
                   ],
                 ),
                 MarkerLayer(
                   markers: [
                     Marker(
                       point: _center,
-                      child: Icon(Icons.location_on, color: Colors.red, size: 40 * _fontScale),
+                      child: Icon(Icons.my_location, color: Colors.red, size: 40 * _fontScale),
                     ),
                     if (_routePoints.length > 1)
                       Marker(
@@ -364,36 +226,26 @@ class _BlindMapPageState extends State<BlindMapPage> {
                 ),
               ],
             ),
-            // Floating Action Button maior para o mapa empresarial
             Positioned(
-              bottom: 120, // Posição ajustada para ficar mais perto do botão de microfone
+              bottom: 150,
               right: 20,
               child: FloatingActionButton.large(
                 heroTag: 'enterpriseMapButton',
-                backgroundColor: _getPrimaryColor(),
-                onPressed: _navigateToBlindMapEnterprisePage,
+                backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
+                onPressed: () => _navigateToPage(const BlindMapEnterprisePage()),
                 child: const Icon(Icons.business, color: Colors.white),
               ),
             ),
-            // Card do botão de microfone
             Positioned(
               bottom: 20,
               left: 20,
               right: 20,
               child: Card(
-                color: _getCardColor(),
+                color: AppTheme.getScaffoldBackgroundColor(_colorScheme),
                 elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 child: InkWell(
-                  onTap: () {
-                    if (_isListening) {
-                      _stopListening();
-                    } else {
-                      _startListening();
-                    }
-                  },
+                  onTap: _isListening ? _stopListening : _startListening,
                   borderRadius: BorderRadius.circular(15),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -402,7 +254,7 @@ class _BlindMapPageState extends State<BlindMapPage> {
                       children: [
                         Icon(
                           _isListening ? Icons.mic_off : Icons.mic,
-                          color: _isListening ? Colors.red : _getMicIconColor(),
+                          color: _isListening ? Colors.red : AppTheme.getPrimaryColor(_colorScheme),
                           size: 36 * _fontScale,
                         ),
                         const SizedBox(width: 16),
@@ -411,7 +263,10 @@ class _BlindMapPageState extends State<BlindMapPage> {
                             _isListening
                                 ? "Ouvindo..."
                                 : (_lastWords.isEmpty ? "Toque para falar" : _lastWords),
-                            style: TextStyle(fontSize: 18 * _fontScale, color: _getTextColor()),
+                            style: TextStyle(
+                              fontSize: 18 * _fontScale,
+                              color: AppTheme.getMessageTextColor(_colorScheme, false),
+                            ),
                             textAlign: TextAlign.center,
                           ),
                         ),
