@@ -24,11 +24,11 @@ class _BlindChatPageState extends State<BlindChatPage> {
   double _fontScale = 1.0;
   String _colorScheme = 'Padrão';
 
+  /// Variável de controle para evitar múltiplos toques (anti-stress).
+  bool _isActionInProgress = false;
+
   List<Map<String, String>> _messages = [
-    {
-      'sender': 'System',
-      'text': 'Pressione o botão para começar a transcrever sua voz.',
-    },
+    {'sender': 'System', 'text': 'Pressione o botão para começar a transcrever sua voz.'},
   ];
 
   @override
@@ -78,21 +78,40 @@ class _BlindChatPageState extends State<BlindChatPage> {
     });
     _textController.clear();
     _scrollToBottom();
-    _readLastMessage(); // Lê a transcrição em voz alta para confirmação
+    _readLastMessage();
   }
 
-  /// Inicia o processo de escuta de voz.
+  /// Inicia o processo de escuta de voz, com proteção contra toques rápidos.
   void _startListening() {
-    _accessibilityService.startListening(
-      onResult: (recognizedWords) {
-        _addMyMessage(recognizedWords);
-      },
-    );
+    if (_isActionInProgress || _isListening) return;
+
+    try {
+      setState(() => _isActionInProgress = true);
+      _accessibilityService.startListening(
+        onResult: (recognizedWords) {
+          _addMyMessage(recognizedWords);
+        },
+      );
+    } finally {
+      // Libera a trava após um curto período
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (mounted) setState(() => _isActionInProgress = false);
+      });
+    }
   }
 
-  /// Para o processo de escuta de voz.
+  /// Para o processo de escuta de voz, com proteção contra toques rápidos.
   void _stopListening() {
-    _accessibilityService.stopListening();
+    if (_isActionInProgress) return;
+
+    try {
+      setState(() => _isActionInProgress = true);
+      _accessibilityService.stopListening();
+    } finally {
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (mounted) setState(() => _isActionInProgress = false);
+      });
+    }
   }
 
   void _toggleInputMode() =>
@@ -115,10 +134,7 @@ class _BlindChatPageState extends State<BlindChatPage> {
     return Scaffold(
       backgroundColor: AppTheme.getScaffoldBackgroundColor(_colorScheme),
       appBar: AppBar(
-        title: Text(
-          'Minhas Transcrições',
-          style: TextStyle(color: Colors.white, fontSize: 20 * _fontScale),
-        ),
+        title: Text('Minhas Transcrições', style: TextStyle(color: Colors.white, fontSize: 20 * _fontScale)),
         backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -151,9 +167,9 @@ class _BlindChatPageState extends State<BlindChatPage> {
                           color: isSystemMessage
                               ? Colors.transparent
                               : AppTheme.getMessageBubbleColor(
-                                  _colorScheme,
-                                  false,
-                                ),
+                            _colorScheme,
+                            false,
+                          ),
                           borderRadius: BorderRadius.circular(15.0),
                         ),
                         child: Text(
@@ -182,39 +198,39 @@ class _BlindChatPageState extends State<BlindChatPage> {
                   Expanded(
                     child: _isAudioInputMode
                         ? GestureDetector(
-                            onLongPressStart: (_) => _startListening(),
-                            onLongPressEnd: (_) => _stopListening(),
-                            child: FloatingActionButton.extended(
-                              heroTag: 'micButtonChat',
-                              backgroundColor: AppTheme.getPrimaryColor(
-                                _colorScheme,
-                              ),
-                              onPressed: () {},
-                              label: Text(
-                                _isListening
-                                    ? "Ouvindo..."
-                                    : "Pressione para transcrever",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16 * _fontScale,
-                                ),
-                              ),
-                              icon: Icon(
-                                _isListening ? Icons.mic_off : Icons.mic,
-                                color: Colors.white,
-                              ),
-                            ),
-                          )
-                        : TextField(
-                            controller: _textController,
-                            decoration: InputDecoration(
-                              hintText: "Digite para transcrever...",
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(20.0),
-                              ),
-                            ),
-                            onSubmitted: (text) => _addMyMessage(text),
+                      onLongPressStart: _isActionInProgress ? null : (_) => _startListening(),
+                      onLongPressEnd: (_) => _stopListening(),
+                      child: FloatingActionButton.extended(
+                        heroTag: 'micButtonChat',
+                        backgroundColor: AppTheme.getPrimaryColor(
+                          _colorScheme,
+                        ),
+                        onPressed: () {},
+                        label: Text(
+                          _isListening
+                              ? "Ouvindo..."
+                              : "Pressione para transcrever",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16 * _fontScale,
                           ),
+                        ),
+                        icon: Icon(
+                          _isListening ? Icons.mic_off : Icons.mic,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                        : TextField(
+                      controller: _textController,
+                      decoration: InputDecoration(
+                        hintText: "Digite para transcrever...",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20.0),
+                        ),
+                      ),
+                      onSubmitted: (text) => _addMyMessage(text),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   FloatingActionButton(

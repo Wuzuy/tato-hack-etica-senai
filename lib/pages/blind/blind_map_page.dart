@@ -4,13 +4,13 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:tato/models/command_result.dart';
-import 'package:tato/settings_page.dart';
 import 'package:tato/services/accessibility_service.dart';
 import 'package:tato/services/command_interpreter_service.dart';
 import 'package:tato/services/gemini_service.dart';
 import 'package:tato/services/global_command_service.dart';
 import 'package:tato/services/map_service.dart';
 import 'package:tato/services/settings_service.dart';
+import 'package:tato/settings_page.dart';
 import 'package:tato/utils/app_theme.dart';
 
 import 'blind_chat_page.dart';
@@ -37,19 +37,20 @@ class _BlindMapPageState extends State<BlindMapPage> {
   // --- Estado da UI e Controladores ---
   final MapController _mapController = MapController();
   List<LatLng> _routePoints = [];
-  LatLng _center = LatLng(0, 0); // Posição inicial neutra
+  LatLng? _center; // Alterado para nulo inicialmente
   bool _isListening = false;
   double _fontScale = 1.0;
   String _colorScheme = 'Padrão';
   String _lastWords = '';
   final String _orsApiKey = dotenv.env['OPEN_ROUTE_SERVICE_API_KEY'] ?? '';
+  bool _isActionInProgress = false;
 
   @override
   void initState() {
     super.initState();
     _commandInterpreterService = CommandInterpreterService(_geminiService);
-    // CORRIGIDO: Instancia e atribui o serviço global corretamente.
-    _globalCommandService = GlobalCommandService(_commandInterpreterService, _accessibilityService);
+    _globalCommandService =
+        GlobalCommandService(_commandInterpreterService, _accessibilityService);
     _initializePage();
   }
 
@@ -64,45 +65,51 @@ class _BlindMapPageState extends State<BlindMapPage> {
   Future<void> _initializePage() async {
     _fontScale = await _settingsService.loadFontScale();
     _colorScheme = await _settingsService.loadColorScheme();
-
-    // CORRIGIDO: Passa o callback para o initialize.
     await _accessibilityService.initialize(
       onListeningStateChanged: (isListening) {
         if (mounted) setState(() => _isListening = isListening);
       },
     );
-
     await _accessibilityService.speak(
       "Bem-vindo ao mapa. Toque no botão de microfone e diga para onde quer ir.",
     );
     await _centerOnCurrentLocation();
-    if (mounted) setState(() {});
   }
 
-  /// Inicia a escuta de voz.
+  /// Inicia a escuta de voz, com proteção contra toques rápidos.
   void _startListening() {
-    setState(() => _lastWords = '');
-    // CORRIGIDO: Chamada simplificada.
-    _accessibilityService.startListening(
-      onResult: (recognizedWords) {
-        setState(() => _lastWords = recognizedWords);
-        _handleVoiceCommand(recognizedWords);
-      },
-    );
+    if (_isActionInProgress || _isListening) return;
+
+    try {
+      setState(() {
+        _isActionInProgress = true;
+        _lastWords = '';
+      });
+      _accessibilityService.startListening(
+        onResult: (recognizedWords) {
+          setState(() => _lastWords = recognizedWords);
+          _handleVoiceCommand(recognizedWords);
+        },
+      );
+    } finally {
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) setState(() => _isActionInProgress = false);
+      });
+    }
   }
 
   /// Para a escuta de voz.
   void _stopListening() {
-    // CORRIGIDO: Chamada simplificada.
     _accessibilityService.stopListening();
   }
 
   /// Interpreta o comando de voz e executa a ação correspondente.
   Future<void> _handleVoiceCommand(String text) async {
-    final CommandResult result = await _commandInterpreterService.interpretCommand(text);
+    final CommandResult result =
+    await _commandInterpreterService.interpretCommand(text);
 
-    // CORRIGIDO: Usa a instância de serviço da classe.
-    final bool wasHandledGlobally = await _globalCommandService.executeCommand(text, result);
+    final bool wasHandledGlobally =
+    await _globalCommandService.executeCommand(text, result);
 
     if (!wasHandledGlobally) {
       switch (result.intent) {
@@ -111,11 +118,13 @@ class _BlindMapPageState extends State<BlindMapPage> {
           if (address != null) {
             await _plotRouteToAddress(address);
           } else {
-            await _accessibilityService.speak("Não entendi o endereço. Tente novamente.");
+            await _accessibilityService
+                .speak("Não entendi o endereço. Tente novamente.");
           }
           break;
         default:
-          await _accessibilityService.speak("Comando não reconhecido. Diga 'me leve para' e um endereço, ou 'guia de uso' para ajuda.");
+          await _accessibilityService.speak(
+              "Comando não reconhecido. Diga 'me leve para' e um endereço, ou 'guia de uso' para ajuda.");
           break;
       }
     }
@@ -123,17 +132,22 @@ class _BlindMapPageState extends State<BlindMapPage> {
 
   /// Orquestra a busca e o traçado de uma rota para um endereço.
   Future<void> _plotRouteToAddress(String address) async {
+    if (_center == null) {
+      await _accessibilityService.speak("Aguarde, ainda buscando sua localização inicial.");
+      return;
+    }
     await _accessibilityService.speak("Buscando o endereço: $address");
-    LatLng? destination = await _mapService.getCoordinatesFromAddress(address, _center);
+    LatLng? destination = await _mapService.getCoordinatesFromAddress(address, _center!);
 
-    if (destination != null && _routePoints.isNotEmpty) {
-      final startPoint = _routePoints.first;
-      List<LatLng> points = await _mapService.getRoute(startPoint, destination, _orsApiKey);
+    if (destination != null) {
+      List<LatLng> points =
+      await _mapService.getRoute(_center!, destination, _orsApiKey);
       setState(() => _routePoints = points);
       _mapController.move(destination, 15.0);
       await _accessibilityService.speak("Rota para o destino traçada no mapa.");
     } else {
-      await _accessibilityService.speak("Não foi possível encontrar o endereço ou sua localização atual.");
+      await _accessibilityService
+          .speak("Não foi possível encontrar o endereço.");
     }
   }
 
@@ -142,19 +156,20 @@ class _BlindMapPageState extends State<BlindMapPage> {
     try {
       final Position position = await _mapService.getCurrentLocation();
       final currentLocation = LatLng(position.latitude, position.longitude);
-      setState(() {
-        _center = currentLocation;
-        _routePoints = [currentLocation];
-        _mapController.move(currentLocation, 15.0);
-      });
+      if (mounted) {
+        setState(() {
+          _center = currentLocation;
+          _routePoints = [currentLocation];
+        });
+      }
     } catch (e) {
       await _accessibilityService.speak(e.toString());
     }
   }
 
-  /// Helper para navegar para uma página e recarregar as configs ao voltar.
   void _navigateToPage(Widget page) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page))
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => page))
         .then((_) => _initializePage());
   }
 
@@ -196,11 +211,13 @@ class _BlindMapPageState extends State<BlindMapPage> {
         ],
       ),
       body: SafeArea(
-        child: Stack(
+        child: _center == null
+            ? Center(child: CircularProgressIndicator(color: AppTheme.getPrimaryColor(_colorScheme)))
+            : Stack(
           children: <Widget>[
             FlutterMap(
               mapController: _mapController,
-              options: MapOptions(center: _center, zoom: 15.0),
+              options: MapOptions(center: _center!, zoom: 15.0),
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -214,7 +231,7 @@ class _BlindMapPageState extends State<BlindMapPage> {
                 MarkerLayer(
                   markers: [
                     Marker(
-                      point: _center,
+                      point: _center!,
                       child: Icon(Icons.my_location, color: Colors.red, size: 40 * _fontScale),
                     ),
                     if (_routePoints.length > 1)
