@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "79862490037",
+    "project_id": "tato-senai-caxias",
+    "storage_bucket": "tato-senai-caxias.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:79862490037:android:d6330e6936a7cb21f66ffc",
+        "android_client_info": {
+          "package_name": "com.example.tato"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBS93C3Q6IK2Y2PJaG6dJ9iqwFDuk6oSHc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

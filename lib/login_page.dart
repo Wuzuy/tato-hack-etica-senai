@@ -1,87 +1,130 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:tato/pages/second_page.dart';
-
-// import 'database/auth_service.dart';
+import 'package:tato/pages/tato_page.dart';
+import 'package:tato/services/auth_service.dart';
+import 'package:tato/services/user_service.dart';
+import 'package:tato/services/settings_service.dart';
+import 'package:tato/utils/app_theme.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({Key? key}) : super(key: key);
+  const LoginPage({super.key});
 
   @override
-  _LoginPageState createState() => _LoginPageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
+  // --- Serviços ---
+  final AuthService _authService = AuthService();
+  final UserService _userService = UserService();
+  final SettingsService _settingsService = SettingsService();
+
+  // --- Controladores e Estado da UI ---
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  // final AuthService _authService = AuthService();
+  final TextEditingController _nameController = TextEditingController();
   bool _isLoading = false;
+  bool _isLoginMode = true;
+  String _colorScheme = 'Padrão';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTheme();
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
-  void _handleLogin() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    // Modo de depuração
-    if (_emailController.text != '' && _passwordController.text != '') {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const SecondPage()),
-      );
-      return;
-    } else {
-      _showLoginFailedMessage('Por favor, insira e-mail e senha.');
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
-    // try {
-    //   final user = await _authService.login(
-    //     email: _emailController.text,
-    //     password: _passwordController.text,
-    //   );
-
-    //   setState(() {
-    //     _isLoading = false;
-    //   });
-
-    //   if (user != null) {
-    //     Navigator.of(context).pushReplacement(
-    //       MaterialPageRoute(builder: (context) => const SecondPage()),
-    //     );
-    //   } else {
-    //     _showLoginFailedMessage('Login falhou. Verifique suas credenciais.');
-    //   }
-    // } catch (e) {
-    //   setState(() {
-    //     _isLoading = false;
-    //   });
-    //   _showLoginFailedMessage('Erro ao fazer login: $e');
-    // }
+  Future<void> _loadTheme() async {
+    _colorScheme = await _settingsService.loadColorScheme();
+    if (mounted) setState(() {});
   }
 
-  void _showLoginFailedMessage(String s) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(s), backgroundColor: Colors.red));
+  /// Lida com o envio do formulário, seja para login ou cadastro.
+  Future<void> _submit() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
+    try {
+      if (_isLoginMode) {
+        // Lógica de Login
+        final userCredential = await _authService.signInWithEmailPassword(
+          _emailController.text.trim(),
+          _passwordController.text.trim(),
+        );
+        if (userCredential != null && mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const SecondPage()),
+          );
+        } else {
+          _showAuthFailedMessage(
+            "Falha no login. Verifique seu e-mail e senha.",
+          );
+        }
+      } else {
+        // Lógica de Cadastro
+        final userCredential = await _authService.signUpWithEmailPassword(
+          _emailController.text.trim(),
+          _passwordController.text.trim(),
+        );
+        if (userCredential != null && userCredential.user != null) {
+          await _userService.createUserInDatabase(
+            userCredential.user!,
+            _nameController.text.trim(),
+          );
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const TATOPage()),
+            );
+          }
+        } else {
+          _showAuthFailedMessage(
+            "Falha no cadastro. O e-mail pode já estar em uso ou a senha é muito fraca.",
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Exibe uma mensagem de erro.
+  void _showAuthFailedMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = AppTheme.getPrimaryColor(_colorScheme);
+    final backgroundColor = AppTheme.getScaffoldBackgroundColor(_colorScheme);
+    final textColor = _colorScheme == 'Modo Escuro'
+        ? Colors.white
+        : primaryColor;
+    final buttonTextColor = _colorScheme == 'Modo Escuro'
+        ? Colors.white
+        : primaryColor;
+
     return Scaffold(
-      backgroundColor: const Color.fromRGBO(0, 69, 118, 1),
+      backgroundColor: primaryColor,
       appBar: AppBar(
-        title: const Text('Login', style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color.fromRGBO(0, 69, 118, 1),
+        title: Text(
+          _isLoginMode ? 'Login' : 'Cadastro',
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: primaryColor,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: SafeArea(
         child: Center(
@@ -92,15 +135,36 @@ class _LoginPageState extends State<LoginPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Icon(Icons.person, size: 100, color: Colors.white),
-                const SizedBox(height: 50),
+                const SizedBox(height: 30),
+
+                if (!_isLoginMode) // Campo de Nome (apenas no cadastro)
+                  TextField(
+                    controller: _nameController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Nome',
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.white54),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.white),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                  ),
+                if (!_isLoginMode) const SizedBox(height: 20),
+
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: 'E-mail',
-                    labelStyle: const TextStyle(color: Colors.white),
-                    border: OutlineInputBorder(
+                    labelStyle: const TextStyle(color: Colors.white70),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Colors.white54),
                       borderRadius: BorderRadius.circular(15),
                     ),
                     focusedBorder: OutlineInputBorder(
@@ -117,8 +181,9 @@ class _LoginPageState extends State<LoginPage> {
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: 'Senha',
-                    labelStyle: const TextStyle(color: Colors.white),
-                    border: OutlineInputBorder(
+                    labelStyle: const TextStyle(color: Colors.white70),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Colors.white54),
                       borderRadius: BorderRadius.circular(15),
                     ),
                     focusedBorder: OutlineInputBorder(
@@ -129,25 +194,20 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 30),
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _handleLogin,
+                  onPressed: _isLoading ? null : _submit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 80,
-                      vertical: 20,
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
                   child: _isLoading
-                      ? const CircularProgressIndicator(
-                          color: Color.fromRGBO(0, 69, 118, 1),
-                        )
-                      : const Text(
-                          'ENTRAR',
+                      ? CircularProgressIndicator(color: primaryColor)
+                      : Text(
+                          _isLoginMode ? 'ENTRAR' : 'CADASTRAR',
                           style: TextStyle(
-                            color: Color.fromRGBO(0, 69, 118, 1),
+                            color: buttonTextColor,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
@@ -155,17 +215,12 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 TextButton(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Funcionalidade de cadastro em desenvolvimento',
-                        ),
-                      ),
-                    );
+                    if (_isLoading) return;
+                    setState(() => _isLoginMode = !_isLoginMode);
                   },
-                  child: const Text(
-                    'Cadastro',
-                    style: TextStyle(
+                  child: Text(
+                    _isLoginMode ? 'Criar uma conta' : 'Já tenho uma conta',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),

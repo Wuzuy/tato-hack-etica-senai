@@ -20,7 +20,9 @@ class _SosPageState extends State<SosPage> {
     super.initState();
     _initTts();
     _initSpeechToText();
-    _speak('Socorro enviado! Sua localização e pedido de ajuda foram enviados para os serviços de emergência.');
+    _speak(
+      'Socorro enviado! Sua localização e pedido de ajuda foram enviados para os serviços de emergência.',
+    );
   }
 
   @override
@@ -124,10 +126,7 @@ class _SosPageState extends State<SosPage> {
               const Text(
                 'Sua localização e pedido de ajuda foram enviados para os serviços de emergência.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.white70,
-                ),
+                style: TextStyle(fontSize: 18, color: Colors.white70),
               ),
               const SizedBox(height: 40),
               Text(
@@ -143,12 +142,17 @@ class _SosPageState extends State<SosPage> {
               ElevatedButton(
                 onPressed: _toggleListening,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _isListening ? Colors.red[900] : Colors.white,
+                  backgroundColor: _isListening
+                      ? Colors.red[900]
+                      : Colors.white,
                   foregroundColor: _isListening ? Colors.white : Colors.red,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 15,
+                  ),
                 ),
                 child: Text(
                   _isListening ? 'Ouvindo...' : 'Toque para Falar',
@@ -161,6 +165,7 @@ class _SosPageState extends State<SosPage> {
               const SizedBox(height: 40),
               ElevatedButton(
                 onPressed: () {
+                  // FIX Ir para blind_map_enterprise_page
                   Navigator.of(context).popUntil((route) => route.isFirst);
                 },
                 style: ElevatedButton.styleFrom(
@@ -169,14 +174,14 @@ class _SosPageState extends State<SosPage> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 15,
+                  ),
                 ),
                 child: const Text(
                   'Voltar para o Mapa',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ),
             ],

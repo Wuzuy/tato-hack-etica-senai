@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:geocoding/geocoding.dart' as geocoding;
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
@@ -31,13 +30,16 @@ class MapService {
   }
 
   /// Converte uma string de endereço em coordenadas, priorizando locais próximos ao usuário.
-  Future<LatLng?> getCoordinatesFromAddress(String address, LatLng userLocation) async {
+  Future<LatLng?> getCoordinatesFromAddress(
+    String address,
+    LatLng userLocation,
+  ) async {
     // Usamos o endpoint de autocomplete que permite um 'ponto de foco'
     final url = Uri.parse(
-        'https://api.openrouteservice.org/geocode/autocomplete'
-            '?text=$address'
-            '&focus.point.lon=${userLocation.longitude}'
-            '&focus.point.lat=${userLocation.latitude}'
+      'https://api.openrouteservice.org/geocode/autocomplete'
+      '?text=$address'
+      '&focus.point.lon=${userLocation.longitude}'
+      '&focus.point.lat=${userLocation.latitude}',
     );
 
     try {
@@ -51,7 +53,10 @@ class MapService {
         if (features.isNotEmpty) {
           // Pegamos o primeiro resultado, que será o mais relevante
           final coords = features.first['geometry']['coordinates'] as List;
-          return LatLng((coords[1] as num).toDouble(), (coords[0] as num).toDouble());
+          return LatLng(
+            (coords[1] as num).toDouble(),
+            (coords[0] as num).toDouble(),
+          );
         }
       }
       return null;

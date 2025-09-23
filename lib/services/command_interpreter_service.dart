@@ -42,6 +42,7 @@ class CommandInterpreterService {
       - "open_map": Quando o usuário quer abrir o mapa geral.
       - "navigate_to_address": Quando o usuário quer ir para um local específico.
       - "open_chat": Quando o usuário quer abrir a página de chat.
+      - "open_map_enterprise": Quando o usuário quer abrir o mapa empresarial."
         - Parâmetros: {"address": "o endereço completo extraído do texto"}
       - "emergency_call": Quando o usuário pede ajuda ou menciona emergência.
       - "read_usage_guide": Quando o usuário pergunta como usar o app ou pede o guia.

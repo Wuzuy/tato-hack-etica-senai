@@ -1,9 +1,16 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:tato/models/command_result.dart';
 import 'package:tato/services/accessibility_service.dart';
+import 'package:tato/services/auth_service.dart';
+import 'package:tato/services/chat_service.dart';
+import 'package:tato/services/command_interpreter_service.dart';
+import 'package:tato/services/gemini_service.dart';
+import 'package:tato/services/global_command_service.dart';
 import 'package:tato/services/settings_service.dart';
 import 'package:tato/utils/app_theme.dart';
 
-/// Uma página que funciona como um transcritor de voz, exibindo o que o usuário fala.
+/// Página de chat em grupo com comandos de voz inteligentes.
 class BlindChatPage extends StatefulWidget {
   const BlindChatPage({super.key});
 
@@ -12,44 +19,33 @@ class BlindChatPage extends StatefulWidget {
 }
 
 class _BlindChatPageState extends State<BlindChatPage> {
-  // --- Serviços Necessários ---
+  // --- Serviços ---
   final SettingsService _settingsService = SettingsService();
   final AccessibilityService _accessibilityService = AccessibilityService();
+  final GeminiService _geminiService = GeminiService();
+  final ChatService _chatService = ChatService();
+  final AuthService _authService = AuthService();
+  late final CommandInterpreterService _commandInterpreterService;
+  late final GlobalCommandService _globalCommandService;
 
-  // --- Controladores e Estado da UI ---
+  // --- Estado da UI e Controladores ---
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isListening = false;
   bool _isAudioInputMode = true;
   double _fontScale = 1.0;
   String _colorScheme = 'Padrão';
-
-  /// Variável de controle para evitar múltiplos toques (anti-stress).
   bool _isActionInProgress = false;
-
-  List<Map<String, String>> _messages = [
-    {'sender': 'System', 'text': 'Pressione o botão para começar a transcrever sua voz.'},
-  ];
 
   @override
   void initState() {
     super.initState();
-    _initializePage();
-  }
-
-  /// Carrega as configurações e inicializa os serviços.
-  Future<void> _initializePage() async {
-    _fontScale = await _settingsService.loadFontScale();
-    _colorScheme = await _settingsService.loadColorScheme();
-
-    await _accessibilityService.initialize(
-      onListeningStateChanged: (isListening) {
-        if (mounted) setState(() => _isListening = isListening);
-      },
+    _commandInterpreterService = CommandInterpreterService(_geminiService);
+    _globalCommandService = GlobalCommandService(
+      _commandInterpreterService,
+      _accessibilityService,
     );
-
-    _readLastMessage();
-    if (mounted) setState(() {});
+    _initializePage();
   }
 
   @override
@@ -61,27 +57,19 @@ class _BlindChatPageState extends State<BlindChatPage> {
     super.dispose();
   }
 
-  /// Lê a última mensagem/transcrição em voz alta.
-  Future<void> _readLastMessage() async {
-    if (_messages.isNotEmpty) {
-      final lastMessage = _messages.last;
-      await _accessibilityService.speak(lastMessage['text']!);
-    }
+  /// Carrega as configurações e inicializa os serviços.
+  Future<void> _initializePage() async {
+    _fontScale = await _settingsService.loadFontScale();
+    _colorScheme = await _settingsService.loadColorScheme();
+    await _accessibilityService.initialize(
+      onListeningStateChanged: (isListening) {
+        if (mounted) setState(() => _isListening = isListening);
+      },
+    );
+    if (mounted) setState(() {});
   }
 
-  /// Adiciona o texto do usuário (falado ou digitado) à lista.
-  void _addMyMessage(String text) {
-    if (text.trim().isEmpty) return;
-
-    setState(() {
-      _messages.add({'sender': 'Você', 'text': text});
-    });
-    _textController.clear();
-    _scrollToBottom();
-    _readLastMessage();
-  }
-
-  /// Inicia o processo de escuta de voz, com proteção contra toques rápidos.
+  /// Inicia o processo de escuta de voz.
   void _startListening() {
     if (_isActionInProgress || _isListening) return;
 
@@ -89,28 +77,35 @@ class _BlindChatPageState extends State<BlindChatPage> {
       setState(() => _isActionInProgress = true);
       _accessibilityService.startListening(
         onResult: (recognizedWords) {
-          _addMyMessage(recognizedWords);
+          _handleVoiceCommand(recognizedWords);
         },
       );
     } finally {
-      // Libera a trava após um curto período
-      Future.delayed(const Duration(milliseconds: 1000), () {
+      Future.delayed(const Duration(seconds: 1), () {
         if (mounted) setState(() => _isActionInProgress = false);
       });
     }
   }
 
-  /// Para o processo de escuta de voz, com proteção contra toques rápidos.
+  /// Para o processo de escuta de voz.
   void _stopListening() {
-    if (_isActionInProgress) return;
+    _accessibilityService.stopListening();
+  }
 
-    try {
-      setState(() => _isActionInProgress = true);
-      _accessibilityService.stopListening();
-    } finally {
-      Future.delayed(const Duration(milliseconds: 1000), () {
-        if (mounted) setState(() => _isActionInProgress = false);
-      });
+  /// Processa o texto falado, decidindo se é um comando ou uma mensagem de chat.
+  Future<void> _handleVoiceCommand(String text) async {
+    final CommandResult result = await _commandInterpreterService
+        .interpretCommand(text);
+
+    final bool wasHandledGlobally = await _globalCommandService.executeCommand(
+      text,
+      result,
+    );
+
+    if (!wasHandledGlobally) {
+      // Se não for um comando global, assume que é uma mensagem para o chat.
+      // A IA é inteligente para classificar falas comuns como 'send_chat_message'.
+      await _chatService.sendMessage(text);
     }
   }
 
@@ -120,11 +115,7 @@ class _BlindChatPageState extends State<BlindChatPage> {
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       }
     });
   }
@@ -134,7 +125,10 @@ class _BlindChatPageState extends State<BlindChatPage> {
     return Scaffold(
       backgroundColor: AppTheme.getScaffoldBackgroundColor(_colorScheme),
       appBar: AppBar(
-        title: Text('Minhas Transcrições', style: TextStyle(color: Colors.white, fontSize: 20 * _fontScale)),
+        title: Text(
+          'Chat da Equipe',
+          style: TextStyle(color: Colors.white, fontSize: 20 * _fontScale),
+        ),
         backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -145,48 +139,97 @@ class _BlindChatPageState extends State<BlindChatPage> {
         child: Column(
           children: <Widget>[
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  final message = _messages[index];
-                  final isSystemMessage = message['sender'] == 'System';
-
-                  return Align(
-                    alignment: Alignment.centerLeft,
-                    child: GestureDetector(
-                      onTap: () =>
-                          _accessibilityService.speak(message['text']!),
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(
-                          vertical: 5.0,
-                          horizontal: 10.0,
-                        ),
-                        padding: const EdgeInsets.all(12.0),
-                        decoration: BoxDecoration(
-                          color: isSystemMessage
-                              ? Colors.transparent
-                              : AppTheme.getMessageBubbleColor(
-                            _colorScheme,
-                            false,
-                          ),
-                          borderRadius: BorderRadius.circular(15.0),
-                        ),
-                        child: Text(
-                          message['text']!,
-                          style: TextStyle(
-                            color: AppTheme.getMessageTextColor(
-                              _colorScheme,
-                              false,
-                            ),
-                            fontStyle: isSystemMessage
-                                ? FontStyle.italic
-                                : FontStyle.normal,
-                            fontSize: 16 * _fontScale,
-                          ),
-                        ),
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _chatService.getMessagesStream(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.getPrimaryColor(_colorScheme),
                       ),
-                    ),
+                    );
+                  }
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return const Center(
+                      child: Text("Seja o primeiro a enviar uma mensagem!"),
+                    );
+                  }
+                  if (snapshot.hasError) {
+                    return const Center(
+                      child: Text("Erro ao carregar o chat."),
+                    );
+                  }
+
+                  WidgetsBinding.instance.addPostFrameCallback(
+                    (_) => _scrollToBottom(),
+                  );
+                  final messages = snapshot.data!.docs;
+
+                  return ListView.builder(
+                    controller: _scrollController,
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final messageData =
+                          messages[index].data() as Map<String, dynamic>;
+                      final isMe =
+                          messageData['senderId'] ==
+                          _authService.currentUser?.uid;
+                      final senderName = messageData['senderName'] ?? 'Anônimo';
+
+                      return Align(
+                        alignment: isMe
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: GestureDetector(
+                          onTap: () => _accessibilityService.speak(
+                            "${isMe ? 'Você' : senderName} disse: ${messageData['text']}",
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.symmetric(
+                              vertical: 5,
+                              horizontal: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.getMessageBubbleColor(
+                                _colorScheme,
+                                isMe,
+                              ),
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: isMe
+                                  ? CrossAxisAlignment.end
+                                  : CrossAxisAlignment.start,
+                              children: [
+                                if (!isMe)
+                                  Text(
+                                    senderName,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12 * _fontScale,
+                                      color: AppTheme.getMessageTextColor(
+                                        _colorScheme,
+                                        false,
+                                      ),
+                                    ),
+                                  ),
+                                Text(
+                                  messageData['text'] ?? '',
+                                  style: TextStyle(
+                                    color: AppTheme.getMessageTextColor(
+                                      _colorScheme,
+                                      isMe,
+                                    ),
+                                    fontSize: 16 * _fontScale,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
@@ -198,39 +241,49 @@ class _BlindChatPageState extends State<BlindChatPage> {
                   Expanded(
                     child: _isAudioInputMode
                         ? GestureDetector(
-                      onLongPressStart: _isActionInProgress ? null : (_) => _startListening(),
-                      onLongPressEnd: (_) => _stopListening(),
-                      child: FloatingActionButton.extended(
-                        heroTag: 'micButtonChat',
-                        backgroundColor: AppTheme.getPrimaryColor(
-                          _colorScheme,
-                        ),
-                        onPressed: () {},
-                        label: Text(
-                          _isListening
-                              ? "Ouvindo..."
-                              : "Pressione para transcrever",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16 * _fontScale,
-                          ),
-                        ),
-                        icon: Icon(
-                          _isListening ? Icons.mic_off : Icons.mic,
-                          color: Colors.white,
-                        ),
-                      ),
-                    )
+                            onLongPressStart:
+                                _isActionInProgress || _isListening
+                                ? null
+                                : (_) => _startListening(),
+                            onLongPressEnd: (_) => _stopListening(),
+                            child: FloatingActionButton.extended(
+                              heroTag: 'micButtonChat',
+                              backgroundColor: AppTheme.getPrimaryColor(
+                                _colorScheme,
+                              ),
+                              onPressed: () {},
+                              label: Text(
+                                _isListening
+                                    ? "Ouvindo..."
+                                    : "Pressione para falar",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16 * _fontScale,
+                                ),
+                              ),
+                              icon: Icon(
+                                _isListening ? Icons.mic_off : Icons.mic,
+                                color: Colors.white,
+                              ),
+                            ),
+                          )
                         : TextField(
-                      controller: _textController,
-                      decoration: InputDecoration(
-                        hintText: "Digite para transcrever...",
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20.0),
-                        ),
-                      ),
-                      onSubmitted: (text) => _addMyMessage(text),
-                    ),
+                            controller: _textController,
+                            decoration: InputDecoration(
+                              hintText: "Digite sua mensagem...",
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20.0),
+                              ),
+                            ),
+                            style: TextStyle(
+                              color: AppTheme.getMessageTextColor(
+                                _colorScheme,
+                                false,
+                              ),
+                            ),
+                            onSubmitted: (text) =>
+                                _chatService.sendMessage(text),
+                          ),
                   ),
                   const SizedBox(width: 8),
                   FloatingActionButton(
