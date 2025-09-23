@@ -1,20 +1,34 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:tato/services/user_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final UserService _userService = UserService();
 
   User? get currentUser => _auth.currentUser;
 
   // signup function
-  Future<UserCredential?> signUpWithEmailPassword(
+  Future<User?> signUpWithEmailPassword(
+    String companyId,
+    String name,
     String email,
     String password,
   ) async {
     try {
-      return await _auth.createUserWithEmailAndPassword(
+      final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      if (userCredential.user != null) {
+        await _userService.createUserInDatabase(
+          companyId,
+          userCredential.user!,
+          name,
+        );
+        return userCredential.user;
+      }
+      return null;
     } on FirebaseAuthException catch (e) {
       print("Erro no Cadastro: $e");
       return null;

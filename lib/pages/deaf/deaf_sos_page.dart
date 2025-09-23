@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:tato/settings_page.dart';
+import 'package:tato/pages/settings_page.dart';
 import 'package:tato/services/settings_service.dart';
 import 'package:tato/utils/app_theme.dart';
 
@@ -75,8 +75,15 @@ class _DeafSosPageState extends State<DeafSosPage> {
             icon: const Icon(Icons.settings, color: Colors.white),
             onPressed: () {
               Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (context) => const SettingsPage(useGoogleFonts: true)))
-                  .then((_) => _initializePage()); // Recarrega as configurações ao voltar
+                  .push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          const SettingsPage(useGoogleFonts: true),
+                    ),
+                  )
+                  .then(
+                    (_) => _initializePage(),
+                  ); // Recarrega as configurações ao voltar
             },
           ),
         ],
@@ -113,10 +120,10 @@ class _DeafSosPageState extends State<DeafSosPage> {
                   child: _isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
                       : Icon(
-                    Icons.warning,
-                    color: Colors.white,
-                    size: 100 * _fontScale,
-                  ),
+                          Icons.warning,
+                          color: Colors.white,
+                          size: 100 * _fontScale,
+                        ),
                 ),
               ),
             ],

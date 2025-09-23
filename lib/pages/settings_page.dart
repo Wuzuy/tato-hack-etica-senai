@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:tato/pages/login_page.dart';
+import 'package:tato/services/auth_service.dart';
 import 'package:tato/services/settings_service.dart';
 import 'package:tato/utils/app_theme.dart';
 
@@ -14,6 +16,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final SettingsService _settingsService = SettingsService();
+  final AuthService _authService = AuthService();
 
   // Variáveis de estado da UI
   double _fontScale = 1.0;
@@ -45,6 +48,17 @@ class _SettingsPageState extends State<SettingsPage> {
     if (newScheme == null) return;
     setState(() => _colorScheme = newScheme);
     await _settingsService.saveColorScheme(newScheme);
+  }
+
+  Future<void> _signOut() async {
+    await _authService.signOut();
+
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (Route<dynamic> route) => false,
+      );
+    }
   }
 
   TextStyle _getTextStyle(
@@ -139,6 +153,28 @@ class _SettingsPageState extends State<SettingsPage> {
                         child: Text(value, style: _getTextStyle(16)),
                       );
                     }).toList(),
+              ),
+              const Spacer(),
+
+              Center(
+                child: ElevatedButton.icon(
+                  onPressed: _signOut,
+                  icon: const Icon(Icons.logout, color: Colors.white),
+                  label: Text(
+                    'Sair da Conta',
+                    style: _getTextStyle(16).copyWith(color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade700,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

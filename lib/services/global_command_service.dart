@@ -6,7 +6,7 @@ import 'package:tato/services/command_interpreter_service.dart';
 
 import 'package:tato/pages/blind/blind_map_page.dart';
 import 'package:tato/pages/blind/blind_chat_page.dart';
-import 'package:tato/settings_page.dart';
+import 'package:tato/pages/settings_page.dart';
 import 'package:tato/pages/blind/blind_usage_guide_page.dart';
 import 'package:tato/pages/blind/sos_page.dart';
 import 'package:tato/pages/blind/blind_map_enterprise_page.dart';

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:tato/pages/blind/blind_map_enterprise_page.dart';
 
 class SosPage extends StatefulWidget {
   const SosPage({super.key});
@@ -165,8 +166,11 @@ class _SosPageState extends State<SosPage> {
               const SizedBox(height: 40),
               ElevatedButton(
                 onPressed: () {
-                  // FIX Ir para blind_map_enterprise_page
-                  Navigator.of(context).popUntil((route) => route.isFirst);
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => const BlindMapEnterprisePage(),
+                    ),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,

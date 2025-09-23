@@ -3,7 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:tato/settings_page.dart';
+import 'package:tato/pages/settings_page.dart';
 import 'package:tato/services/map_service.dart';
 import 'package:tato/services/settings_service.dart';
 import 'package:tato/utils/app_theme.dart';
@@ -59,8 +59,9 @@ class _DeafMapPageState extends State<DeafMapPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     }
   }
@@ -72,10 +73,15 @@ class _DeafMapPageState extends State<DeafMapPage> {
 
     try {
       LatLng? destination = await _mapService.getCoordinatesFromAddress(
-          destinationAddress, _currentLocation!);
+        destinationAddress,
+        _currentLocation!,
+      );
       if (destination != null) {
         List<LatLng> points = await _mapService.getRoute(
-            _currentLocation!, destination, _orsApiKey);
+          _currentLocation!,
+          destination,
+          _orsApiKey,
+        );
         setState(() {
           _routePoints = points;
           _destinationLocation = destination;
@@ -87,13 +93,15 @@ class _DeafMapPageState extends State<DeafMapPage> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Endereço não encontrado.')));
+            const SnackBar(content: Text('Endereço não encontrado.')),
+          );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Erro ao traçar a rota.')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Erro ao traçar a rota.')));
       }
     } finally {
       if (mounted) setState(() => _isTracingRoute = false);
@@ -120,126 +128,144 @@ class _DeafMapPageState extends State<DeafMapPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: () => _navigateToPage(const SettingsPage(useGoogleFonts: true)),
+            onPressed: () =>
+                _navigateToPage(const SettingsPage(useGoogleFonts: true)),
           ),
         ],
       ),
       body: SafeArea(
         child: _currentLocation == null
             ? Center(
-            child: CircularProgressIndicator(
-                color: AppTheme.getPrimaryColor(_colorScheme)))
+                child: CircularProgressIndicator(
+                  color: AppTheme.getPrimaryColor(_colorScheme),
+                ),
+              )
             : Stack(
-          children: [
-            FlutterMap(
-              options: MapOptions(
-                center: _currentLocation!,
-                zoom: 15.0,
-              ),
-              mapController: _mapController,
-              children: [
-                TileLayer(
-                  urlTemplate:
-                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.tato.app',
-                ),
-                if (_routePoints.isNotEmpty)
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                          points: _routePoints,
-                          color: Colors.blue,
-                          strokeWidth: 5.0),
-                    ],
-                  ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: _currentLocation!,
-                      child: const Icon(Icons.my_location,
-                          color: Colors.red, size: 40.0),
-                    ),
-                    if (_destinationLocation != null)
-                      Marker(
-                        point: _destinationLocation!,
-                        child: const Icon(Icons.location_on,
-                            color: Colors.blue, size: 40.0),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-            Positioned(
-              bottom: 16.0,
-              left: 16.0,
-              right: 16.0,
-              child: Card(
-                color: AppTheme.getScaffoldBackgroundColor(_colorScheme),
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15)),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Row(
+                children: [
+                  FlutterMap(
+                    options: MapOptions(center: _currentLocation!, zoom: 15.0),
+                    mapController: _mapController,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _addressController,
-                          decoration: InputDecoration(
-                            hintText: 'Pesquisar endereço...',
-                            border: InputBorder.none,
-                            hintStyle: TextStyle(
-                                color: AppTheme.getMessageTextColor(
-                                    _colorScheme, false)
-                                    .withOpacity(0.6)),
-                          ),
-                          style: TextStyle(
-                              color: AppTheme.getMessageTextColor(
-                                  _colorScheme, false),
-                              fontSize: 16 * _fontScale),
-                          onSubmitted: _isTracingRoute
-                              ? null
-                              : (value) => _traceRoute(value),
-                        ),
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.tato.app',
                       ),
-                      _isTracingRoute
-                          ? SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                          AlwaysStoppedAnimation<Color>(
-                            AppTheme.getPrimaryColor(
-                                _colorScheme),
-                          ),
+                      if (_routePoints.isNotEmpty)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: _routePoints,
+                              color: Colors.blue,
+                              strokeWidth: 5.0,
+                            ),
+                          ],
                         ),
-                      )
-                          : IconButton(
-                        icon: Icon(Icons.search,
-                            color: AppTheme.getPrimaryColor(
-                                _colorScheme)),
-                        onPressed: () =>
-                            _traceRoute(_addressController.text),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: _currentLocation!,
+                            child: const Icon(
+                              Icons.my_location,
+                              color: Colors.red,
+                              size: 40.0,
+                            ),
+                          ),
+                          if (_destinationLocation != null)
+                            Marker(
+                              point: _destinationLocation!,
+                              child: const Icon(
+                                Icons.location_on,
+                                color: Colors.blue,
+                                size: 40.0,
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
-                ),
+                  Positioned(
+                    bottom: 16.0,
+                    left: 16.0,
+                    right: 16.0,
+                    child: Card(
+                      color: AppTheme.getScaffoldBackgroundColor(_colorScheme),
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _addressController,
+                                decoration: InputDecoration(
+                                  hintText: 'Pesquisar endereço...',
+                                  border: InputBorder.none,
+                                  hintStyle: TextStyle(
+                                    color: AppTheme.getMessageTextColor(
+                                      _colorScheme,
+                                      false,
+                                    ).withOpacity(0.6),
+                                  ),
+                                ),
+                                style: TextStyle(
+                                  color: AppTheme.getMessageTextColor(
+                                    _colorScheme,
+                                    false,
+                                  ),
+                                  fontSize: 16 * _fontScale,
+                                ),
+                                onSubmitted: _isTracingRoute
+                                    ? null
+                                    : (value) => _traceRoute(value),
+                              ),
+                            ),
+                            _isTracingRoute
+                                ? SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        AppTheme.getPrimaryColor(_colorScheme),
+                                      ),
+                                    ),
+                                  )
+                                : IconButton(
+                                    icon: Icon(
+                                      Icons.search,
+                                      color: AppTheme.getPrimaryColor(
+                                        _colorScheme,
+                                      ),
+                                    ),
+                                    onPressed: () =>
+                                        _traceRoute(_addressController.text),
+                                  ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 80.0,
+                    right: 16.0,
+                    child: FloatingActionButton(
+                      heroTag: 'enterpriseBtn',
+                      backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
+                      onPressed: () =>
+                          _navigateToPage(const DeafMapEnterprisePage()),
+                      child: const Icon(
+                        Icons.business,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            Positioned(
-              bottom: 80.0,
-              right: 16.0,
-              child: FloatingActionButton(
-                heroTag: 'enterpriseBtn',
-                backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
-                onPressed: () => _navigateToPage(const DeafMapEnterprisePage()),
-                child: const Icon(Icons.business,
-                    color: Colors.white, size: 30),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

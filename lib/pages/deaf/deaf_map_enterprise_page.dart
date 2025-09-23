@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:tato/settings_page.dart';
+import 'package:tato/pages/settings_page.dart';
 import 'package:tato/services/settings_service.dart';
 import 'package:tato/utils/app_theme.dart';
 
@@ -53,8 +53,15 @@ class _DeafMapEnterprisePageState extends State<DeafMapEnterprisePage> {
             icon: const Icon(Icons.settings, color: Colors.white),
             onPressed: () {
               Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (context) => const SettingsPage(useGoogleFonts: true)))
-                  .then((_) => _initializePage()); // Recarrega as configurações ao voltar
+                  .push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          const SettingsPage(useGoogleFonts: true),
+                    ),
+                  )
+                  .then(
+                    (_) => _initializePage(),
+                  ); // Recarrega as configurações ao voltar
             },
           ),
         ],
@@ -80,7 +87,10 @@ class _DeafMapEnterprisePageState extends State<DeafMapEnterprisePage> {
                           'Erro ao carregar o mapa. Verifique a configuração no pubspec.yaml.',
                           style: GoogleFonts.poppins(
                             textStyle: TextStyle(
-                              color: AppTheme.getMessageTextColor(_colorScheme, false),
+                              color: AppTheme.getMessageTextColor(
+                                _colorScheme,
+                                false,
+                              ),
                               fontSize: 14 * _fontScale,
                             ),
                           ),
@@ -106,10 +116,16 @@ class _DeafMapEnterprisePageState extends State<DeafMapEnterprisePage> {
                     backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
                     onPressed: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => const DeafChatPage()),
+                        MaterialPageRoute(
+                          builder: (context) => const DeafChatPage(),
+                        ),
                       );
                     },
-                    child: const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 30),
+                    child: const Icon(
+                      Icons.chat_bubble_outline,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   FloatingActionButton(
@@ -117,7 +133,10 @@ class _DeafMapEnterprisePageState extends State<DeafMapEnterprisePage> {
                     backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
                     onPressed: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => const VoiceTranscriptionDeafPage()),
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const VoiceTranscriptionDeafPage(),
+                        ),
                       );
                     },
                     child: const Icon(Icons.mic, color: Colors.white, size: 30),
@@ -133,7 +152,9 @@ class _DeafMapEnterprisePageState extends State<DeafMapEnterprisePage> {
                 backgroundColor: Colors.red,
                 onPressed: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => const DeafSosPage()),
+                    MaterialPageRoute(
+                      builder: (context) => const DeafSosPage(),
+                    ),
                   );
                 },
                 child: const Icon(Icons.warning, color: Colors.white, size: 30),

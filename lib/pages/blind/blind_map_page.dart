@@ -10,7 +10,7 @@ import 'package:tato/services/gemini_service.dart';
 import 'package:tato/services/global_command_service.dart';
 import 'package:tato/services/map_service.dart';
 import 'package:tato/services/settings_service.dart';
-import 'package:tato/settings_page.dart';
+import 'package:tato/pages/settings_page.dart';
 import 'package:tato/utils/app_theme.dart';
 
 import 'blind_chat_page.dart';
@@ -49,8 +49,10 @@ class _BlindMapPageState extends State<BlindMapPage> {
   void initState() {
     super.initState();
     _commandInterpreterService = CommandInterpreterService(_geminiService);
-    _globalCommandService =
-        GlobalCommandService(_commandInterpreterService, _accessibilityService);
+    _globalCommandService = GlobalCommandService(
+      _commandInterpreterService,
+      _accessibilityService,
+    );
     _initializePage();
   }
 
@@ -105,11 +107,13 @@ class _BlindMapPageState extends State<BlindMapPage> {
 
   /// Interpreta o comando de voz e executa a ação correspondente.
   Future<void> _handleVoiceCommand(String text) async {
-    final CommandResult result =
-    await _commandInterpreterService.interpretCommand(text);
+    final CommandResult result = await _commandInterpreterService
+        .interpretCommand(text);
 
-    final bool wasHandledGlobally =
-    await _globalCommandService.executeCommand(text, result);
+    final bool wasHandledGlobally = await _globalCommandService.executeCommand(
+      text,
+      result,
+    );
 
     if (!wasHandledGlobally) {
       switch (result.intent) {
@@ -118,13 +122,15 @@ class _BlindMapPageState extends State<BlindMapPage> {
           if (address != null) {
             await _plotRouteToAddress(address);
           } else {
-            await _accessibilityService
-                .speak("Não entendi o endereço. Tente novamente.");
+            await _accessibilityService.speak(
+              "Não entendi o endereço. Tente novamente.",
+            );
           }
           break;
         default:
           await _accessibilityService.speak(
-              "Comando não reconhecido. Diga 'me leve para' e um endereço, ou 'guia de uso' para ajuda.");
+            "Comando não reconhecido. Diga 'me leve para' e um endereço, ou 'guia de uso' para ajuda.",
+          );
           break;
       }
     }
@@ -133,21 +139,30 @@ class _BlindMapPageState extends State<BlindMapPage> {
   /// Orquestra a busca e o traçado de uma rota para um endereço.
   Future<void> _plotRouteToAddress(String address) async {
     if (_center == null) {
-      await _accessibilityService.speak("Aguarde, ainda buscando sua localização inicial.");
+      await _accessibilityService.speak(
+        "Aguarde, ainda buscando sua localização inicial.",
+      );
       return;
     }
     await _accessibilityService.speak("Buscando o endereço: $address");
-    LatLng? destination = await _mapService.getCoordinatesFromAddress(address, _center!);
+    LatLng? destination = await _mapService.getCoordinatesFromAddress(
+      address,
+      _center!,
+    );
 
     if (destination != null) {
-      List<LatLng> points =
-      await _mapService.getRoute(_center!, destination, _orsApiKey);
+      List<LatLng> points = await _mapService.getRoute(
+        _center!,
+        destination,
+        _orsApiKey,
+      );
       setState(() => _routePoints = points);
       _mapController.move(destination, 15.0);
       await _accessibilityService.speak("Rota para o destino traçada no mapa.");
     } else {
-      await _accessibilityService
-          .speak("Não foi possível encontrar o endereço.");
+      await _accessibilityService.speak(
+        "Não foi possível encontrar o endereço.",
+      );
     }
   }
 
@@ -181,7 +196,11 @@ class _BlindMapPageState extends State<BlindMapPage> {
         backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.white, size: 24 * _fontScale),
+          icon: Icon(
+            Icons.arrow_back,
+            color: Colors.white,
+            size: 24 * _fontScale,
+          ),
           onPressed: () {
             _accessibilityService.stopSpeaking();
             Navigator.of(context).pop();
@@ -189,7 +208,11 @@ class _BlindMapPageState extends State<BlindMapPage> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.help_outline, color: Colors.white, size: 24 * _fontScale),
+            icon: Icon(
+              Icons.help_outline,
+              color: Colors.white,
+              size: 24 * _fontScale,
+            ),
             onPressed: () => _navigateToPage(const UsageGuidePage()),
             tooltip: 'Guia de Uso',
           ),
@@ -199,12 +222,20 @@ class _BlindMapPageState extends State<BlindMapPage> {
             tooltip: 'Chat',
           ),
           IconButton(
-            icon: Icon(Icons.settings, color: Colors.white, size: 24 * _fontScale),
+            icon: Icon(
+              Icons.settings,
+              color: Colors.white,
+              size: 24 * _fontScale,
+            ),
             onPressed: () => _navigateToPage(const SettingsPage()),
             tooltip: 'Configurações',
           ),
           IconButton(
-            icon: Icon(Icons.my_location, color: Colors.white, size: 24 * _fontScale),
+            icon: Icon(
+              Icons.my_location,
+              color: Colors.white,
+              size: 24 * _fontScale,
+            ),
             onPressed: _centerOnCurrentLocation,
             tooltip: 'Centralizar',
           ),
@@ -212,89 +243,119 @@ class _BlindMapPageState extends State<BlindMapPage> {
       ),
       body: SafeArea(
         child: _center == null
-            ? Center(child: CircularProgressIndicator(color: AppTheme.getPrimaryColor(_colorScheme)))
+            ? Center(
+                child: CircularProgressIndicator(
+                  color: AppTheme.getPrimaryColor(_colorScheme),
+                ),
+              )
             : Stack(
-          children: <Widget>[
-            FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(center: _center!, zoom: 15.0),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.tato.app',
-                ),
-                PolylineLayer(
-                  polylines: [
-                    Polyline(points: _routePoints, strokeWidth: 5.0, color: Colors.blue),
-                  ],
-                ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: _center!,
-                      child: Icon(Icons.my_location, color: Colors.red, size: 40 * _fontScale),
-                    ),
-                    if (_routePoints.length > 1)
-                      Marker(
-                        point: _routePoints.last,
-                        child: Icon(Icons.location_on, color: Colors.blue, size: 40 * _fontScale),
+                children: <Widget>[
+                  FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(center: _center!, zoom: 15.0),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.tato.app',
                       ),
-                  ],
-                ),
-              ],
-            ),
-            Positioned(
-              bottom: 150,
-              right: 20,
-              child: FloatingActionButton.large(
-                heroTag: 'enterpriseMapButton',
-                backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
-                onPressed: () => _navigateToPage(const BlindMapEnterprisePage()),
-                child: const Icon(Icons.business, color: Colors.white),
-              ),
-            ),
-            Positioned(
-              bottom: 20,
-              left: 20,
-              right: 20,
-              child: Card(
-                color: AppTheme.getScaffoldBackgroundColor(_colorScheme),
-                elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                child: InkWell(
-                  onTap: _isListening ? _stopListening : _startListening,
-                  borderRadius: BorderRadius.circular(15),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _isListening ? Icons.mic_off : Icons.mic,
-                          color: _isListening ? Colors.red : AppTheme.getPrimaryColor(_colorScheme),
-                          size: 36 * _fontScale,
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Text(
-                            _isListening
-                                ? "Ouvindo..."
-                                : (_lastWords.isEmpty ? "Toque para falar" : _lastWords),
-                            style: TextStyle(
-                              fontSize: 18 * _fontScale,
-                              color: AppTheme.getMessageTextColor(_colorScheme, false),
-                            ),
-                            textAlign: TextAlign.center,
+                      PolylineLayer(
+                        polylines: [
+                          Polyline(
+                            points: _routePoints,
+                            strokeWidth: 5.0,
+                            color: Colors.blue,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: _center!,
+                            child: Icon(
+                              Icons.my_location,
+                              color: Colors.red,
+                              size: 40 * _fontScale,
+                            ),
+                          ),
+                          if (_routePoints.length > 1)
+                            Marker(
+                              point: _routePoints.last,
+                              child: Icon(
+                                Icons.location_on,
+                                color: Colors.blue,
+                                size: 40 * _fontScale,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  Positioned(
+                    bottom: 150,
+                    right: 20,
+                    child: FloatingActionButton.large(
+                      heroTag: 'enterpriseMapButton',
+                      backgroundColor: AppTheme.getPrimaryColor(_colorScheme),
+                      onPressed: () =>
+                          _navigateToPage(const BlindMapEnterprisePage()),
+                      child: const Icon(Icons.business, color: Colors.white),
                     ),
                   ),
-                ),
+                  Positioned(
+                    bottom: 20,
+                    left: 20,
+                    right: 20,
+                    child: Card(
+                      color: AppTheme.getScaffoldBackgroundColor(_colorScheme),
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: InkWell(
+                        onTap: _isListening ? _stopListening : _startListening,
+                        borderRadius: BorderRadius.circular(15),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 20,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                _isListening ? Icons.mic_off : Icons.mic,
+                                color: _isListening
+                                    ? Colors.red
+                                    : AppTheme.getPrimaryColor(_colorScheme),
+                                size: 36 * _fontScale,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  _isListening
+                                      ? "Ouvindo..."
+                                      : (_lastWords.isEmpty
+                                            ? "Toque para falar"
+                                            : _lastWords),
+                                  style: TextStyle(
+                                    fontSize: 18 * _fontScale,
+                                    color: AppTheme.getMessageTextColor(
+                                      _colorScheme,
+                                      false,
+                                    ),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }
